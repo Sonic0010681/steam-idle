@@ -397,7 +397,7 @@ app.get('/api/account/status', (req, res) => {
     });
 });
 
-app.post('/api/account/login', (req, res) => {
+app.post('/api/account/login', async (req, res) => {
     const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
     const { username, password } = req.body || {};
 
@@ -409,6 +409,54 @@ app.post('/api/account/login', (req, res) => {
     acc.error = null;
     acc.steamGuardNeeded = false;
 
+    // 1. Primary: Steam WebBrowser Authentication Session (Explicit Email Code Dispatch)
+    try {
+        const loginSession = new LoginSession(EAuthTokenPlatformType.WebBrowser);
+        acc.loginSession = loginSession;
+
+        let startRes;
+        try {
+            startRes = await loginSession.startWithCredentials({
+                accountName: username,
+                password: password
+            });
+        } catch (err) {
+            console.error(`❌ [${username}] WebBrowser loginSession error:`, err.message);
+            const errMsg = getSteamErrorMessage(err);
+            acc.error = errMsg;
+            return res.json({ success: false, error: errMsg });
+        }
+
+        if (startRes.actionRequired) {
+            acc.steamGuardNeeded = true;
+            acc.steamGuardType = 'email';
+
+            // E-posta kodunun kullanıcı e-postasına gönderilmesini tetikle
+            try {
+                await loginSession._attemptEmailCodeAuth();
+                console.log(`📧 [${username}] E-Posta kodu gönderme isteği Steam WebAPI'ye iletildi!`);
+            } catch (e) {
+                console.log(`ℹ️ [${username}] Email code auth attempt info:`, e.message);
+            }
+
+            return res.json({
+                success: false,
+                steamGuard: true,
+                type: 'email',
+                username: acc.username
+            });
+        }
+
+        if (loginSession.refreshToken) {
+            const client = createSteamClientForAccount(acc);
+            client.logOn({ refreshToken: loginSession.refreshToken });
+            return res.json({ success: true, username: acc.username });
+        }
+    } catch (e) {
+        console.error(`❌ [${username}] LoginSession WebBrowser exception:`, e);
+    }
+
+    // 2. Fallback: Direct SteamUser Client logOn
     const client = createSteamClientForAccount(acc);
 
     let responded = false;
