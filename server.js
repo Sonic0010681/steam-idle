@@ -1,5 +1,7 @@
 const express = require('express');
 const SteamUser = require('steam-user');
+const { LoginSession, EAuthTokenPlatformType } = require('steam-session');
+const QRCode = require('qrcode');
 const path = require('path');
 
 const app = express();
@@ -41,6 +43,7 @@ const POPULAR_GAMES = [
 // sessionAccounts: sessionId -> Set of accountKeys
 const accounts = new Map();
 const sessionAccounts = new Map();
+const pendingQrSessions = new Map();
 
 function getAccountKey(sessionId, username) {
     return `${sessionId}:${username.toLowerCase()}`;
@@ -198,7 +201,6 @@ function getSteamErrorMessage(err) {
     return messages[err.eresult] || err.message || 'Bilinmeyen hata';
 }
 
-// Helper: Liderlik Tablosu Oluştur
 function getLeaderboardForSession(sessionId) {
     const keys = sessionAccounts.get(sessionId) || new Set();
     const list = [];
@@ -220,7 +222,6 @@ function getLeaderboardForSession(sessionId) {
         });
     }
 
-    // Toplam saat kasma süresine göre azalan sıralama (En çok kasan 1.)
     list.sort((a, b) => b.totalIdleSeconds - a.totalIdleSeconds);
     return list;
 }
@@ -305,7 +306,7 @@ app.get('/api/account/status', (req, res) => {
     });
 });
 
-// Giriş Yap
+// Giriş Yap (Kullanıcı Adı & Şifre)
 app.post('/api/account/login', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username, password } = req.body;
@@ -356,6 +357,87 @@ app.post('/api/account/login', (req, res) => {
             }
         }
     }, 500);
+});
+
+// FEATURE: QR KOD İLE STEAM MOBİL GİRİŞİ BAŞLAT
+app.post('/api/account/qr-start', async (req, res) => {
+    const sessionId = req.headers['x-session-id'] || req.body.sid;
+    if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
+
+    try {
+        const loginSession = new LoginSession(EAuthTokenPlatformType.SteamClient);
+        const qrSessionId = 'qr_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+        const { qrChallengeUrl } = await loginSession.startWithQR();
+        const qrDataUrl = await QRCode.toDataURL(qrChallengeUrl, { margin: 2, width: 260 });
+
+        const sessionState = {
+            sessionId,
+            qrSessionId,
+            loginSession,
+            authenticated: false,
+            username: null,
+            error: null
+        };
+
+        pendingQrSessions.set(qrSessionId, sessionState);
+
+        loginSession.on('authenticated', async () => {
+            try {
+                const steamID64 = loginSession.steamID ? loginSession.steamID.getSteamID64() : null;
+                const username = loginSession.accountName || (steamID64 ? `user_${steamID64.substring(10)}` : 'steam_user');
+
+                console.log(`✅ [QR Login] Steam Mobil QR Taraması Başarılı! Kullanıcı: ${username}`);
+
+                const acc = getOrCreateAccount(sessionId, username);
+                acc.error = null;
+                acc.steamGuardNeeded = false;
+                if (loginSession.accountName) acc.username = loginSession.accountName;
+
+                const client = createSteamClientForAccount(acc);
+                client.logOn({
+                    refreshToken: loginSession.refreshToken
+                });
+
+                sessionState.authenticated = true;
+                sessionState.username = username;
+            } catch (e) {
+                console.error('QR Login işlenirken hata:', e);
+                sessionState.error = e.message;
+            }
+        });
+
+        loginSession.on('timeout', () => {
+            sessionState.error = 'QR Kod zaman aşımına uğradı. Yeniden kod oluşturun.';
+        });
+
+        loginSession.on('error', (err) => {
+            sessionState.error = err.message || 'QR Giriş hatası';
+        });
+
+        res.json({ success: true, qrSessionId, qrDataUrl });
+    } catch (err) {
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// FEATURE: QR GİRİŞ DURUMUNU SORGULA
+app.get('/api/account/qr-status', (req, res) => {
+    const { qrSessionId } = req.query;
+    if (!qrSessionId || !pendingQrSessions.has(qrSessionId)) {
+        return res.json({ success: false, error: 'QR Oturumu bulunamadı veya süresi doldu' });
+    }
+
+    const state = pendingQrSessions.get(qrSessionId);
+    if (state.authenticated) {
+        pendingQrSessions.delete(qrSessionId);
+        return res.json({ success: true, authenticated: true, username: state.username });
+    } else if (state.error) {
+        pendingQrSessions.delete(qrSessionId);
+        return res.json({ success: false, error: state.error });
+    }
+
+    res.json({ success: true, authenticated: false });
 });
 
 // Steam Guard Doğrula
@@ -451,7 +533,7 @@ app.post('/api/account/personastate', (req, res) => {
 // MASTER CONTROL 1: TEK TIKLA TÜM HESAPLARDA IDLE BAŞLAT
 app.post('/api/session/idle-all', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
-    const { appIds } = req.body; // Örn: [730] veya seçilenler
+    const { appIds } = req.body;
 
     if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
 
@@ -587,6 +669,7 @@ app.listen(PORT, () => {
 ║ 🎮 STEAM IDLE PRO MASTER - SAAT KASICI & ANALİZ          ║
 ║ http://localhost:${PORT}                                   ║
 ║                                                          ║
+║ ⚡ 📲 STEAM MOBİL UYGULAMASIYLA QR KOD İLE GİRİŞ DESTEĞİ! ║
 ║ ⚡ 1. Tek Tıkla Tüm Hesaplarda Saat Kasma (Master)       ║
 ║ ⚡ 3. Görünmez (Invisible) & Gizli Modda Saat Kasma      ║
 ║ ⚡ 🎨 RGB / Cyberpunk / Synthwave Temaları               ║

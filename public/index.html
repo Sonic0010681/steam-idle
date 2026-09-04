@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steam Idle Pro Master - Saati Kas & Analiz et!</title>
+    <title>Steam Idle Pro Master - Saati Kas & QR Giriş!</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -95,59 +95,45 @@
         .bg-glow-1 {
             position: fixed; top: -10%; left: -10%; width: 50vw; height: 50vw; z-index: 0;
             background: radial-gradient(circle, var(--neon-primary) 0.08, transparent 70%);
-            pointer-events: none; opacity: 0.15;
-            transition: background 0.4s ease;
+            pointer-events: none; opacity: 0.15; transition: background 0.4s ease;
         }
 
         .bg-glow-2 {
             position: fixed; bottom: -10%; right: -10%; width: 50vw; height: 50vw; z-index: 0;
             background: radial-gradient(circle, var(--neon-secondary) 0.08, transparent 70%);
-            pointer-events: none; opacity: 0.15;
-            transition: background 0.4s ease;
+            pointer-events: none; opacity: 0.15; transition: background 0.4s ease;
         }
 
-        /* Layout */
         .app-wrapper {
-            position: relative; z-index: 1;
-            display: flex; flex: 1; min-height: 100vh;
+            position: relative; z-index: 1; display: flex; flex: 1; min-height: 100vh;
         }
 
         /* Sidebar */
         .sidebar {
-            width: 320px;
-            background: var(--sidebar-bg);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid var(--card-border);
-            display: flex; flex-direction: column;
+            width: 320px; background: var(--sidebar-bg); backdrop-filter: blur(20px);
+            border-right: 1px solid var(--card-border); display: flex; flex-direction: column;
             padding: 22px 18px; transition: all 0.3s ease; flex-shrink: 0;
         }
 
-        .brand {
-            display: flex; align-items: center; gap: 12px;
-            margin-bottom: 22px; padding: 0 6px;
-        }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; padding: 0 6px; }
 
         .brand-icon {
             width: 44px; height: 44px; border-radius: 12px;
             background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary));
             display: flex; align-items: center; justify-content: center;
-            font-size: 22px; color: #000;
-            box-shadow: 0 0 20px var(--neon-primary);
+            font-size: 22px; color: #000; box-shadow: 0 0 20px var(--neon-primary);
         }
 
         .brand-text h1 {
-            font-family: 'Orbitron', monospace;
-            font-size: 1.2rem; font-weight: 900; letter-spacing: 2px;
+            font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900; letter-spacing: 2px;
             background: linear-gradient(135deg, #fff, var(--neon-primary));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
         .brand-text p { font-size: 0.7rem; color: var(--text-muted); font-weight: 500; }
 
-        /* Master Control Box in Sidebar */
         .master-box {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--card-border);
+            background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border);
             border-radius: 14px; padding: 14px; margin-bottom: 20px;
         }
 
@@ -174,22 +160,19 @@
         .btn-master-start:hover { transform: translateY(-1px); filter: brightness(1.1); }
 
         .btn-master-stop {
-            background: rgba(239, 68, 68, 0.15); color: var(--red);
-            border: 1px solid rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
         .btn-master-stop:hover { background: rgba(239, 68, 68, 0.25); }
 
-        /* Accounts Section Header */
         .accounts-header {
             display: flex; align-items: center; justify-content: space-between;
             margin-bottom: 12px; padding: 0 4px;
         }
 
         .accounts-header span {
-            font-family: 'Orbitron', monospace;
-            font-size: 0.72rem; font-weight: 700; letter-spacing: 2px;
-            color: var(--text-muted); text-transform: uppercase;
+            font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 700;
+            letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase;
         }
 
         .btn-add-account {
@@ -200,31 +183,22 @@
             cursor: pointer; transition: all 0.2s;
         }
 
-        .btn-add-account:hover {
-            background: var(--neon-primary); color: #000;
-            box-shadow: 0 0 15px var(--neon-primary);
-        }
+        .btn-add-account:hover { background: var(--neon-primary); color: #000; box-shadow: 0 0 15px var(--neon-primary); }
 
         .accounts-list {
-            display: flex; flex-direction: column; gap: 10px;
-            overflow-y: auto; flex: 1; padding-right: 4px;
+            display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; padding-right: 4px;
         }
 
         .accounts-list::-webkit-scrollbar { width: 4px; }
         .accounts-list::-webkit-scrollbar-thumb { background: var(--neon-primary); border-radius: 4px; }
 
-        /* Account Item Card */
         .account-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 12px; padding: 12px 14px;
-            display: flex; align-items: center; gap: 12px;
+            background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;
             cursor: pointer; transition: all 0.25s ease; position: relative;
         }
 
-        .account-card:hover {
-            background: rgba(255, 255, 255, 0.05); border-color: var(--card-border);
-        }
+        .account-card:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--card-border); }
 
         .account-card.active {
             background: linear-gradient(135deg, rgba(0, 210, 255, 0.12), rgba(139, 92, 246, 0.1));
@@ -233,16 +207,13 @@
 
         .acc-avatar {
             width: 40px; height: 40px; border-radius: 10px;
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid rgba(255, 255, 255, 0.1);
             display: flex; align-items: center; justify-content: center;
-            font-weight: 800; font-size: 1rem; color: var(--neon-primary);
-            position: relative; flex-shrink: 0;
+            font-weight: 800; font-size: 1rem; color: var(--neon-primary); position: relative; flex-shrink: 0;
         }
 
         .acc-status-dot {
-            width: 9px; height: 9px; border-radius: 50%;
-            position: absolute; bottom: -2px; right: -2px; border: 2px solid #0c1120;
+            width: 9px; height: 9px; border-radius: 50%; position: absolute; bottom: -2px; right: -2px; border: 2px solid #0c1120;
         }
 
         .acc-status-dot.idling { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulseDot 1.5s infinite; }
@@ -254,45 +225,28 @@
         @keyframes pulseDot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } }
 
         .acc-info { overflow: hidden; flex: 1; }
-        .acc-name {
-            font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700;
-            color: var(--text-main); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
-        }
-
+        .acc-name { font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700; color: var(--text-main); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
         .acc-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
 
         .btn-add-full {
             margin-top: 14px; width: 100%; padding: 11px; border-radius: 10px;
             border: 1px dashed var(--card-border); background: rgba(0, 210, 255, 0.04);
             color: var(--neon-primary); font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 700;
-            letter-spacing: 1px; cursor: pointer; transition: all 0.25s;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
+            letter-spacing: 1px; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; gap: 8px;
         }
 
         .btn-add-full:hover { background: rgba(0, 210, 255, 0.15); border-style: solid; box-shadow: 0 0 15px var(--neon-primary); }
 
-        /* Main Content Container */
-        .main-content {
-            flex: 1; padding: 28px 34px; max-width: 980px; margin: 0 auto; width: 100%;
-        }
+        .main-content { flex: 1; padding: 28px 34px; max-width: 980px; margin: 0 auto; width: 100%; }
 
-        /* Top Header Action Bar */
-        .top-navbar {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 24px; gap: 14px; flex-wrap: wrap;
-        }
+        .top-navbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 14px; flex-wrap: wrap; }
 
         .theme-selector {
             display: flex; align-items: center; gap: 6px;
-            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px; padding: 6px;
+            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 6px;
         }
 
-        .theme-pill {
-            width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent;
-            cursor: pointer; transition: all 0.2s ease;
-        }
-
+        .theme-pill { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease; }
         .theme-pill:hover, .theme-pill.active { transform: scale(1.2); border-color: #fff; }
         .pill-cyber { background: linear-gradient(135deg, #00d2ff, #8b5cf6); }
         .pill-cyberpunk { background: linear-gradient(135deg, #fed700, #00e5ff); }
@@ -307,244 +261,125 @@
             cursor: pointer; transition: all 0.25s; display: flex; align-items: center; gap: 8px;
         }
 
-        .btn-leaderboard:hover {
-            background: var(--gold); color: #000; box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
-        }
+        .btn-leaderboard:hover { background: var(--gold); color: #000; box-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
 
-        /* Cards & Containers */
         .card {
             background: var(--card-bg); backdrop-filter: blur(20px);
-            border: 1px solid var(--card-border); border-radius: 18px;
-            padding: 26px; margin-bottom: 22px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            animation: fadeIn 0.3s ease-out;
+            border: 1px solid var(--card-border); border-radius: 18px; padding: 26px; margin-bottom: 22px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: fadeIn 0.3s ease-out;
         }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .card-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .card-title { font-family: 'Orbitron', monospace; font-size: 0.9rem; font-weight: 800; letter-spacing: 2px; color: var(--neon-primary); text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+
+        /* Login Option Tabs */
+        .login-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; }
+        .login-tab-btn {
+            padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03); color: var(--text-muted); font-family: 'Orbitron', monospace;
+            font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
+        }
+        .login-tab-btn.active {
+            background: rgba(0, 210, 255, 0.15); border-color: var(--neon-primary); color: var(--neon-primary);
         }
 
-        .card-title {
-            font-family: 'Orbitron', monospace; font-size: 0.9rem; font-weight: 800;
-            letter-spacing: 2px; color: var(--neon-primary); text-transform: uppercase;
-            display: flex; align-items: center; gap: 10px;
+        /* QR Code Container */
+        .qr-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; background: rgba(255,255,255,0.02); border: 1px solid var(--card-border);
+            border-radius: 16px; margin-bottom: 18px; text-align: center;
         }
+
+        .qr-img-box {
+            padding: 14px; background: #fff; border-radius: 14px;
+            box-shadow: 0 0 25px var(--neon-primary); margin-bottom: 16px;
+        }
+
+        .qr-img-box img { width: 220px; height: 220px; display: block; }
+
+        .qr-instructions { font-size: 0.85rem; color: var(--text-main); line-height: 1.6; max-width: 420px; }
+        .qr-instructions ol { text-align: left; margin-left: 20px; margin-top: 8px; color: var(--text-muted); }
 
         /* Account Header Bar */
         .account-header-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            flex-wrap: wrap; gap: 16px; margin-bottom: 22px;
-            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 16px; padding: 16px 22px;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 22px;
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 16px 22px;
         }
 
         .acc-active-details { display: flex; align-items: center; gap: 14px; }
-
         .acc-active-avatar {
             width: 46px; height: 46px; border-radius: 12px;
             background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary));
             display: flex; align-items: center; justify-content: center;
-            font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900; color: #000;
-            box-shadow: 0 0 15px var(--neon-primary);
+            font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900; color: #000; box-shadow: 0 0 15px var(--neon-primary);
         }
 
         .acc-title-row { display: flex; align-items: center; gap: 8px; }
-
-        .acc-active-title {
-            font-family: 'Orbitron', monospace; font-size: 1.05rem; font-weight: 800; color: #fff;
-        }
-
-        .btn-edit-nick {
-            background: none; border: none; color: var(--text-muted); cursor: pointer;
-            font-size: 0.9rem; transition: color 0.2s;
-        }
-
+        .acc-active-title { font-family: 'Orbitron', monospace; font-size: 1.05rem; font-weight: 800; color: #fff; }
+        .btn-edit-nick { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; transition: color 0.2s; }
         .btn-edit-nick:hover { color: var(--neon-primary); }
-
         .acc-active-id { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
 
-        /* Persona State Selector (Feature 3: Invisible/Online Mode) */
         .persona-selector {
             display: flex; align-items: center; gap: 8px;
-            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px; padding: 6px 12px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px;
         }
-
         .persona-selector label { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; }
-
         .persona-selector select {
-            background: transparent; border: none; color: var(--text-main);
-            font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 600;
-            outline: none; cursor: pointer;
+            background: transparent; border: none; color: var(--text-main); font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 600; outline: none; cursor: pointer;
         }
-
         .persona-selector select option { background: #0f172a; color: #fff; }
 
-        /* Analytics Grid (Feature: Time Analytics) */
-        .analytics-grid {
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
-            margin-bottom: 22px;
-        }
+        .analytics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+        .analytics-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 14px; text-align: center; }
+        .analytics-val { font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-primary); }
+        .analytics-lbl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.2px; margin-top: 4px; }
 
-        .analytics-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 12px; padding: 14px; text-align: center;
-        }
-
-        .analytics-val {
-            font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 800;
-            color: var(--neon-primary);
-        }
-
-        .analytics-lbl {
-            font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;
-            letter-spacing: 1.2px; margin-top: 4px;
-        }
-
-        /* Form Inputs */
         .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px; }
+        .form-group input { width: 100%; padding: 13px 16px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); font-size: 0.92rem; outline: none; transition: all 0.25s; }
+        .form-group input:focus { border-color: var(--neon-primary); box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.15); }
 
-        .form-group label {
-            display: block; font-size: 0.78rem; font-weight: 600;
-            color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px;
-        }
-
-        .form-group input {
-            width: 100%; padding: 13px 16px; border-radius: 10px;
-            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-            color: var(--text-main); font-size: 0.92rem; outline: none; transition: all 0.25s;
-        }
-
-        .form-group input:focus {
-            border-color: var(--neon-primary); box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.15);
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 13px 26px; border: none; border-radius: 10px;
-            font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700;
-            letter-spacing: 1.5px; cursor: pointer; transition: all 0.25s ease;
-            text-transform: uppercase; display: inline-flex; align-items: center;
-            justify-content: center; gap: 8px; width: 100%;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary));
-            color: #000; font-weight: 800; box-shadow: 0 6px 20px rgba(0, 210, 255, 0.2);
-        }
-
+        .btn { padding: 13px 26px; border: none; border-radius: 10px; font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700; letter-spacing: 1.5px; cursor: pointer; transition: all 0.25s ease; text-transform: uppercase; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+        .btn-primary { background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary)); color: #000; font-weight: 800; box-shadow: 0 6px 20px rgba(0, 210, 255, 0.2); }
         .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.1); }
-
-        .btn-danger {
-            background: rgba(239, 68, 68, 0.12); color: var(--red);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
+        .btn-danger { background: rgba(239, 68, 68, 0.12); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3); }
         .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
 
-        /* Games Tab Bar & Filters */
-        .games-tab-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
-        }
-
+        .games-tab-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
         .tabs-list { display: flex; gap: 6px; }
+        .tab-btn { padding: 7px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-family: 'Orbitron', monospace; }
+        .tab-btn.active { background: rgba(0, 210, 255, 0.15); border-color: var(--neon-primary); color: var(--neon-primary); }
 
-        .tab-btn {
-            padding: 7px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700;
-            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-            color: var(--text-muted); cursor: pointer; transition: all 0.2s;
-            font-family: 'Orbitron', monospace;
-        }
+        .search-input { padding: 7px 12px; border-radius: 8px; font-size: 0.8rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; width: 180px; }
 
-        .tab-btn.active {
-            background: rgba(0, 210, 255, 0.15); border-color: var(--neon-primary); color: var(--neon-primary);
-        }
-
-        .search-input {
-            padding: 7px 12px; border-radius: 8px; font-size: 0.8rem;
-            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-            color: var(--text-main); outline: none; width: 180px;
-        }
-
-        /* Games Grid */
-        .games-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; margin-bottom: 16px;
-        }
-
+        .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; margin-bottom: 16px; }
         .games-grid::-webkit-scrollbar { width: 4px; }
         .games-grid::-webkit-scrollbar-thumb { background: var(--neon-primary); border-radius: 4px; }
 
-        .game-card {
-            background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 10px; padding: 11px 13px; display: flex; align-items: center; gap: 10px;
-            cursor: pointer; transition: all 0.2s ease; user-select: none;
-        }
-
+        .game-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 11px 13px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: all 0.2s ease; user-select: none; }
         .game-card:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15); }
+        .game-card.selected { background: rgba(0, 210, 255, 0.12); border-color: var(--neon-primary); box-shadow: 0 0 10px rgba(0, 210, 255, 0.15); }
 
-        .game-card.selected {
-            background: rgba(0, 210, 255, 0.12); border-color: var(--neon-primary);
-            box-shadow: 0 0 10px rgba(0, 210, 255, 0.15);
-        }
-
-        .game-checkbox {
-            width: 17px; height: 17px; border-radius: 4px; border: 2px solid rgba(255,255,255,0.25);
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;
-        }
-
+        .game-checkbox { width: 17px; height: 17px; border-radius: 4px; border: 2px solid rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
         .game-card.selected .game-checkbox { background: var(--neon-primary); border-color: var(--neon-primary); }
         .game-card.selected .game-checkbox::after { content: '✓'; color: #000; font-weight: 900; font-size: 10px; }
 
         .game-title { font-size: 0.8rem; font-weight: 500; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
         .game-appid { font-size: 0.65rem; color: var(--text-muted); font-family: 'Orbitron', monospace; }
 
-        /* Custom App ID row */
         .custom-app-row { display: flex; gap: 10px; margin-top: 12px; }
+        .custom-app-row input { flex: 1; padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); font-size: 0.82rem; outline: none; }
+        .custom-app-row button { padding: 9px 18px; border-radius: 8px; border: none; background: rgba(0, 210, 255, 0.15); color: var(--neon-primary); font-family: 'Orbitron', monospace; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
 
-        .custom-app-row input {
-            flex: 1; padding: 9px 12px; border-radius: 8px;
-            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-            color: var(--text-main); font-size: 0.82rem; outline: none;
-        }
-
-        .custom-app-row button {
-            padding: 9px 18px; border-radius: 8px; border: none;
-            background: rgba(0, 210, 255, 0.15); color: var(--neon-primary);
-            font-family: 'Orbitron', monospace; font-size: 0.75rem; font-weight: 700;
-            cursor: pointer; transition: all 0.2s;
-        }
-
-        /* Leaderboard Modal */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75); backdrop-filter: blur(10px);
-            z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
-        }
-
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal-overlay.active { display: flex; animation: fadeIn 0.25s ease; }
+        .modal-content { background: var(--sidebar-bg); border: 1px solid var(--card-border); border-radius: 20px; width: 100%; max-width: 540px; padding: 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
 
-        .modal-content {
-            background: var(--sidebar-bg); border: 1px solid var(--card-border);
-            border-radius: 20px; width: 100%; max-width: 540px; padding: 26px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        }
-
-        .leader-item {
-            display: flex; align-items: center; gap: 14px;
-            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;
-        }
-
-        .leader-rank {
-            font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900;
-            width: 32px; text-align: center;
-        }
-
+        .leader-item { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; }
+        .leader-rank { font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900; width: 32px; text-align: center; }
         .rank-1 { color: #f59e0b; text-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
         .rank-2 { color: #94a3b8; }
         .rank-3 { color: #b45309; }
@@ -553,7 +388,6 @@
         .leader-name { font-family: 'Orbitron', monospace; font-size: 0.88rem; font-weight: 700; color: #fff; }
         .leader-hours { font-size: 0.8rem; color: var(--neon-primary); font-weight: 600; margin-top: 2px; }
 
-        /* Error & Warning Boxes */
         .error-msg { padding: 12px 16px; border-radius: 10px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--red); font-size: 0.82rem; margin-bottom: 14px; }
         .warn-msg { padding: 12px 16px; border-radius: 10px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); color: var(--orange); font-size: 0.8rem; line-height: 1.5; margin-bottom: 16px; }
 
@@ -577,17 +411,17 @@
     <div class="bg-glow-2"></div>
 
     <div class="app-wrapper">
-        <!-- SIDEBAR: Steam Accounts Switcher & Master Control -->
+        <!-- SIDEBAR -->
         <aside class="sidebar">
             <div class="brand">
                 <div class="brand-icon">🎮</div>
                 <div class="brand-text">
                     <h1>STEAM IDLE</h1>
-                    <p>Master Pro & Analiz</p>
+                    <p>Master Pro & QR Giriş</p>
                 </div>
             </div>
 
-            <!-- FEATURE 1: MASTER CONTROL BOX -->
+            <!-- MASTER CONTROL BOX -->
             <div class="master-box">
                 <div class="master-title">
                     <span>⚡ TOPLU KONTROL (MASTER)</span>
@@ -608,7 +442,7 @@
             </div>
 
             <div class="accounts-list" id="sidebarAccountsList">
-                <!-- Hesap kartları dinamik eklenecek -->
+                <!-- Hesap kartları -->
             </div>
 
             <button class="btn-add-full" onclick="showAddAccountView()">
@@ -618,7 +452,7 @@
 
         <!-- MAIN CONTENT AREA -->
         <main class="main-content">
-            <!-- TOP NAVBAR: Theme Switcher & Leaderboard Button -->
+            <!-- TOP NAVBAR -->
             <div class="top-navbar">
                 <div class="theme-selector" title="Renk Teması Seç">
                     <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; padding: 0 4px;">TEMA:</span>
@@ -634,32 +468,67 @@
                 </button>
             </div>
 
-            <!-- VIEW 1: LOGIN / ADD ACCOUNT FORM -->
+            <!-- VIEW 1: LOGIN WITH PASSWORD OR QR CODE -->
             <div class="view-section active" id="addAccountView">
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">🔐 Yeni Steam Hesabı Ekle</div>
                     </div>
 
-                    <div class="warn-msg">
-                        ⚡ Siteye giren herkes kendi hesabını ekleyebilir. Giriş bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
+                    <!-- LOGIN TYPE TABS (Password vs QR Code) -->
+                    <div class="login-tabs">
+                        <button class="login-tab-btn active" id="loginTabPass" onclick="switchLoginMode('password')">
+                            🔑 Şifre İle Giriş Yap
+                        </button>
+                        <button class="login-tab-btn" id="loginTabQR" onclick="switchLoginMode('qr')">
+                            📱 Steam Mobil QR Kodu İle Giriş Yap
+                        </button>
                     </div>
 
-                    <div id="loginErrorMsg"></div>
+                    <!-- MODE 1: PASSWORD FORM -->
+                    <div id="loginPassMode">
+                        <div class="warn-msg">
+                            ⚡ Siteye giren herkes kendi hesabını ekleyebilir. Giriş bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
+                        </div>
 
-                    <div class="form-group">
-                        <label>Steam Kullanıcı Adı</label>
-                        <input type="text" id="loginUsername" placeholder="Steam kullanıcı adını gir..." autocomplete="off">
+                        <div id="loginErrorMsg"></div>
+
+                        <div class="form-group">
+                            <label>Steam Kullanıcı Adı</label>
+                            <input type="text" id="loginUsername" placeholder="Steam kullanıcı adını gir..." autocomplete="off">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Şifre</label>
+                            <input type="password" id="loginPassword" placeholder="Şifreni gir...">
+                        </div>
+
+                        <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()">
+                            GİRİŞ YAP VE HESABI EKLE
+                        </button>
                     </div>
 
-                    <div class="form-group">
-                        <label>Şifre</label>
-                        <input type="password" id="loginPassword" placeholder="Şifreni gir...">
-                    </div>
+                    <!-- MODE 2: QR CODE SCANNER FORM -->
+                    <div id="loginQRMode" style="display: none;">
+                        <div class="qr-container">
+                            <div class="qr-img-box" id="qrBox">
+                                <span class="spinner" style="width: 30px; height: 30px;"></span>
+                            </div>
 
-                    <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()">
-                        GİRİŞ YAP VE HESABI EKLE
-                    </button>
+                            <div class="qr-instructions">
+                                <strong>📱 Steam Mobil Uygulaması İle Tara:</strong>
+                                <ol>
+                                    <li>Telefonunuzdan <strong>Steam Mobil Uygulamasını</strong> açın.</li>
+                                    <li>Alt kısımdaki <strong>Steam Guard (Kalkan)</strong> simgesine dokunun.</li>
+                                    <li><strong>QR Kodu Tara (Kamera)</strong> seçeneğini seçin ve yukarıdaki kodu okutun!</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <div id="qrStatusMsg" style="text-align: center; color: var(--neon-primary); font-size: 0.85rem; font-weight: 600;">
+                            ⌛ Kod taranması bekleniyor...
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -703,7 +572,7 @@
                         </div>
                     </div>
 
-                    <!-- FEATURE 3: PERSONA STATE SELECTOR (Online / Invisible Mode) -->
+                    <!-- PERSONA STATE SELECTOR (Online / Invisible Mode) -->
                     <div class="persona-selector" title="Steam Profil Durumu">
                         <label>GÖRÜNÜM:</label>
                         <select id="dashPersonaSelect" onchange="changePersonaState(this.value)">
@@ -715,7 +584,7 @@
                     </div>
                 </div>
 
-                <!-- TIME ANALYTICS GRID (Günde/Haftada/Ayda/Toplam Saat Analizi) -->
+                <!-- TIME ANALYTICS GRID -->
                 <div class="analytics-grid">
                     <div class="analytics-card">
                         <div class="analytics-val" id="analyticsToday">0s 0dk</div>
@@ -814,6 +683,8 @@
         let currentTab = 'owned';
         let popularGames = [];
         let pollingInterval = null;
+        let qrPollingInterval = null;
+        let currentQrSessionId = null;
 
         async function apiFetch(url, options = {}) {
             options.headers = options.headers || {};
@@ -841,6 +712,65 @@
         setTheme(savedTheme);
 
         // ============================================================
+        // LOGIN MODE SWITCHER (Password vs QR Code)
+        // ============================================================
+        function switchLoginMode(mode) {
+            if (qrPollingInterval) clearInterval(qrPollingInterval);
+
+            if (mode === 'password') {
+                document.getElementById('loginTabPass').className = 'login-tab-btn active';
+                document.getElementById('loginTabQR').className = 'login-tab-btn';
+                document.getElementById('loginPassMode').style.display = 'block';
+                document.getElementById('loginQRMode').style.display = 'none';
+            } else {
+                document.getElementById('loginTabPass').className = 'login-tab-btn';
+                document.getElementById('loginTabQR').className = 'login-tab-btn active';
+                document.getElementById('loginPassMode').style.display = 'none';
+                document.getElementById('loginQRMode').style.display = 'block';
+                startQrLoginFlow();
+            }
+        }
+
+        async function startQrLoginFlow() {
+            const qrBox = document.getElementById('qrBox');
+            const qrMsg = document.getElementById('qrStatusMsg');
+            qrBox.innerHTML = '<span class="spinner" style="width: 30px; height: 30px;"></span>';
+            qrMsg.textContent = '⌛ Steam QR kodu oluşturuluyor...';
+
+            try {
+                const data = await apiFetch('/api/account/qr-start', { method: 'POST' });
+                if (data.success) {
+                    currentQrSessionId = data.qrSessionId;
+                    qrBox.innerHTML = `<img src="${data.qrDataUrl}" alt="Steam QR Login">`;
+                    qrMsg.textContent = '📱 Steam Mobil uygulamasından QR kodunu okutun...';
+
+                    // Polling for QR status
+                    if (qrPollingInterval) clearInterval(qrPollingInterval);
+                    qrPollingInterval = setInterval(async () => {
+                        try {
+                            const res = await apiFetch(`/api/account/qr-status?qrSessionId=${currentQrSessionId}`);
+                            if (res.authenticated) {
+                                clearInterval(qrPollingInterval);
+                                qrMsg.style.color = 'var(--green)';
+                                qrMsg.textContent = '✅ QR Kod Başarıyla Tarandı! Giriş Yapılıyor...';
+                                activeUsername = res.username;
+                                setTimeout(() => { loadAccounts(); }, 1000);
+                            } else if (res.error) {
+                                clearInterval(qrPollingInterval);
+                                qrMsg.style.color = 'var(--red)';
+                                qrMsg.textContent = '❌ ' + res.error;
+                            }
+                        } catch (e) {}
+                    }, 2000);
+                } else {
+                    qrMsg.textContent = '❌ QR Kod oluşturulamadı: ' + data.error;
+                }
+            } catch (e) {
+                qrMsg.textContent = '❌ Sunucuya bağlanılamadı.';
+            }
+        }
+
+        // ============================================================
         // VIEW SWITCHER
         // ============================================================
         function showView(viewId) {
@@ -852,6 +782,7 @@
             activeUsername = null;
             renderSidebar();
             showView('addAccountView');
+            switchLoginMode('password');
             document.getElementById('loginErrorMsg').innerHTML = '';
         }
 
@@ -963,7 +894,6 @@
                 document.getElementById('dashPersonaSelect').value = String(acc.personaState);
             }
 
-            // ANALİTİK GÜNCELLEME (Feature: Time Analytics)
             const totSec = acc.totalIdleSeconds || 0;
             const daySec = acc.dailySeconds || 0;
             const weekSec = acc.weeklySeconds || 0;
@@ -1007,7 +937,7 @@
         }
 
         // ============================================================
-        // FEATURE 1: MASTER CONTROL (TÜM HESAPLARDA IDLE)
+        // MASTER CONTROL
         // ============================================================
         async function masterStartIdleAll() {
             if (accountsList.length === 0) { alert('Önce en az bir hesap ekleyin!'); return; }
@@ -1039,7 +969,7 @@
         }
 
         // ============================================================
-        // FEATURE 3: PERSONA STATE & NICKNAME
+        // PERSONA STATE & NICKNAME
         // ============================================================
         async function changePersonaState(stateValue) {
             if (!activeUsername) return;
@@ -1069,7 +999,7 @@
         }
 
         // ============================================================
-        // LEADERBOARD MODAL (#1 KİM?)
+        // LEADERBOARD MODAL
         // ============================================================
         function openLeaderboardModal() {
             renderLeaderboard();
