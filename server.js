@@ -397,7 +397,7 @@ app.get('/api/account/status', (req, res) => {
     });
 });
 
-app.post('/api/account/login', async (req, res) => {
+app.post('/api/account/login', (req, res) => {
     const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
     const { username, password } = req.body || {};
 
@@ -409,48 +409,6 @@ app.post('/api/account/login', async (req, res) => {
     acc.error = null;
     acc.steamGuardNeeded = false;
 
-    // 1. Steam WebAPI Credentials Session (Steam-Session Modern Auth)
-    try {
-        const loginSession = new LoginSession(EAuthTokenPlatformType.SteamClient);
-        acc.loginSession = loginSession;
-
-        let startRes;
-        try {
-            startRes = await loginSession.startWithCredentials({
-                accountName: username,
-                password: password
-            });
-        } catch (err) {
-            console.error(`❌ [${username}] LoginSession error:`, err.message);
-            const errMsg = getSteamErrorMessage(err);
-            acc.error = errMsg;
-            return res.json({ success: false, error: errMsg });
-        }
-
-        if (startRes.actionRequired) {
-            acc.steamGuardNeeded = true;
-            const validActions = startRes.validActions || [];
-            const isEmail = validActions.some(a => a.type === 2 || a.type === 'email' || a.type === 'EmailCode');
-            acc.steamGuardType = isEmail ? 'email' : 'app';
-            return res.json({
-                success: false,
-                steamGuard: true,
-                type: acc.steamGuardType,
-                username: acc.username
-            });
-        }
-
-        if (loginSession.refreshToken) {
-            const client = createSteamClientForAccount(acc);
-            client.logOn({ refreshToken: loginSession.refreshToken });
-            acc.loggedIn = true;
-            return res.json({ success: true, username: acc.username });
-        }
-    } catch (e) {
-        console.error(`❌ [${username}] LoginSession exception:`, e);
-    }
-
-    // 2. Direct SteamUser Fallback
     const client = createSteamClientForAccount(acc);
 
     let responded = false;
@@ -467,7 +425,14 @@ app.post('/api/account/login', async (req, res) => {
     });
 
     client.once('steamGuard', (domain) => {
-        sendResponse({ success: false, steamGuard: true, type: domain ? 'email' : 'app', username: acc.username });
+        console.log(`📧 [${acc.username}] Steam E-postaya kod gönderdi! Domain: ${domain || 'e-posta'}`);
+        sendResponse({
+            success: false,
+            steamGuard: true,
+            type: domain ? 'email' : 'app',
+            domain: domain || null,
+            username: acc.username
+        });
     });
 
     client.once('error', (err) => {
@@ -487,7 +452,7 @@ app.post('/api/account/login', async (req, res) => {
         } else if (acc.loggedIn) {
             sendResponse({ success: true, username: acc.username });
         } else {
-            sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı. Şifrenizi kontrol edip tekrar deneyin.' });
+            sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı. Lütfen şifrenizi kontrol edip tekrar deneyin.' });
         }
     }, 8000);
 

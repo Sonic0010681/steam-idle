@@ -1230,10 +1230,11 @@
                 } else if (data.steamGuard) {
                     activeUsername = username;
                     showView('steamGuardView');
+                    const domainStr = data.domain ? ` (${data.domain})` : '';
                     document.getElementById('steamGuardPrompt').textContent =
                         data.type === 'email'
-                            ? `E-postanıza gelen Steam Guard kodunu girin.`
-                            : `Steam mobil uygulamanızdaki Guard kodunu girin.`;
+                            ? `[${username}] E-postanıza${domainStr} gönderilen 5 haneli Steam Guard kodunu girin.`
+                            : `[${username}] Steam mobil uygulamanızdaki 5 haneli Guard kodunu girin.`;
                 } else {
                     errDiv.innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
                 }
