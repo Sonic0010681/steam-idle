@@ -80,6 +80,16 @@ const POPULAR_GAMES = [
     { appId: 107410, name: 'Arma 3' },
 ];
 
+function getLogonID(username) {
+    let hash = 0;
+    const str = String(username || 'steam_idle_pro');
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash % 2000000000) + 100000;
+}
+
 function getOrCreateAccount(rawUsername) {
     const cleanUser = String(rawUsername).trim();
     const key = cleanUser.toLowerCase();
@@ -94,6 +104,7 @@ function getOrCreateAccount(rawUsername) {
         persona: null,
         steamID: null,
         loggedIn: false,
+        refreshToken: null,
         games: [],
         ownedGames: [],
         playingBlocked: false,
@@ -193,23 +204,24 @@ function createSteamClientForAccount(acc) {
 
     client.on('refreshToken', (token) => {
         console.log(`🔑 [${acc.username}] Yeni oturum anahtarı kaydedildi`);
+        acc.refreshToken = token;
         saveAccountSession(acc.username, token);
     });
 
     // Akıllı Oyun Durumu Takibi (Sen oyuna girince bot seni kicklemez, duraklar; oyundan çıkınca devam eder!)
     client.on('playingState', (blocked, playingApp) => {
-        console.log(`🎮 [${acc.username}] Oynama durumu güncellendi: blocked=${blocked}, playingApp=${playingApp}`);
+        console.log(`🎮 [${acc.username}] Oynama durumu: blocked=${blocked}, playingApp=${playingApp}`);
+        const wasBlocked = acc.playingBlocked;
         acc.playingBlocked = !!blocked;
         acc.blockedByApp = playingApp || null;
 
         if (blocked) {
             console.log(`⏸️ [${acc.username}] PC'de oyun tespit edildi (AppID: ${playingApp}). Oyununu kesmemek için bot akıllı beklemeye geçti.`);
-        } else {
+        } else if (wasBlocked && !blocked) {
             console.log(`▶️ [${acc.username}] PC'deki oyun bitti! Bot saat kasmaya otomatik olarak devam ediyor.`);
             if (acc.games && acc.games.length > 0 && acc.loggedIn && acc.client) {
                 try {
                     acc.client.gamesPlayed(acc.games, false);
-                    acc.startTime = Date.now();
                 } catch (e) {}
             }
         }
@@ -240,13 +252,15 @@ function createSteamClientForAccount(acc) {
         acc.error = getSteamErrorMessage(err);
 
         // Oturum değiştiğinde veya bağlantı koptuğunda arka planda otomatik yeniden bağlan
-        if (acc.refreshToken && (err.message.includes('LogonSessionReplaced') || err.message.includes('NoConnection') || err.eresult === 34 || err.eresult === 3)) {
-            console.log(`🔄 [${acc.username}] 8 saniye içinde otomatik yeniden bağlanacak...`);
+        if (acc.refreshToken) {
+            console.log(`🔄 [${acc.username}] 5 saniye içinde otomatik yeniden bağlanacak...`);
             setTimeout(() => {
                 if (!acc.loggedIn && acc.refreshToken && acc.client) {
-                    try { acc.client.logOn({ refreshToken: acc.refreshToken }); } catch (e) {}
+                    try {
+                        acc.client.logOn({ refreshToken: acc.refreshToken, logonID: getLogonID(acc.username) });
+                    } catch (e) {}
                 }
-            }, 8000);
+            }, 5000);
         }
     });
 
@@ -254,11 +268,14 @@ function createSteamClientForAccount(acc) {
         console.log(`🔌 [${acc.username}] Steam bağlantısı kesildi:`, msg);
         acc.loggedIn = false;
         if (acc.refreshToken) {
+            console.log(`🔄 [${acc.username}] 5 saniye içinde otomatik yeniden bağlanacak...`);
             setTimeout(() => {
                 if (!acc.loggedIn && acc.refreshToken && acc.client) {
-                    try { acc.client.logOn({ refreshToken: acc.refreshToken }); } catch (e) {}
+                    try {
+                        acc.client.logOn({ refreshToken: acc.refreshToken, logonID: getLogonID(acc.username) });
+                    } catch (e) {}
                 }
-            }, 6000);
+            }, 5000);
         }
     });
 
@@ -301,8 +318,9 @@ function loadSavedSessions() {
             if (sess && sess.refreshToken && sess.username) {
                 console.log(`🔄 Kayıtlı oturum geri yükleniyor: ${sess.username}`);
                 const acc = getOrCreateAccount(sess.username);
+                acc.refreshToken = sess.refreshToken;
                 const client = createSteamClientForAccount(acc);
-                client.logOn({ refreshToken: sess.refreshToken });
+                client.logOn({ refreshToken: sess.refreshToken, logonID: getLogonID(sess.username) });
             }
         }
     } catch (e) {
@@ -431,9 +449,10 @@ app.post('/api/qr-start', async (req, res) => {
                 if (loginSession.accountName) acc.username = loginSession.accountName;
 
                 saveAccountSession(acc.username, loginSession.refreshToken);
+                acc.refreshToken = loginSession.refreshToken;
 
                 const client = createSteamClientForAccount(acc);
-                client.logOn({ refreshToken: loginSession.refreshToken });
+                client.logOn({ refreshToken: loginSession.refreshToken, logonID: getLogonID(acc.username) });
 
                 sessionState.authenticated = true;
                 sessionState.username = acc.username;
@@ -518,7 +537,8 @@ app.post('/api/login', (req, res) => {
 
     client.logOn({
         accountName: username,
-        password: password
+        password: password,
+        logonID: getLogonID(username)
     });
 
     const timeout = setTimeout(() => {
