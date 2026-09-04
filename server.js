@@ -658,16 +658,16 @@ app.post('/api/reconnect', (req, res) => {
     }, 300);
 });
 
-// 7. Tek bir hesapta oyun idle başlat
+// 7. Tek bir hesapta oyun idle başlat (KESİN KULLANICI İZOLASYONU)
 app.post('/api/idle', (req, res) => {
     const { username, appIds } = req.body;
 
-    let acc = null;
-    if (username) {
-        acc = accounts.get(String(username).toLowerCase().trim());
-    } else {
-        acc = accounts.values().next().value;
+    if (!username) {
+        return res.json({ success: false, error: 'Kullanıcı adı gerekli' });
     }
+
+    const key = String(username).toLowerCase().trim();
+    const acc = accounts.get(key);
 
     if (!acc || !acc.loggedIn || !acc.client) {
         return res.json({ success: false, error: 'Önce geçerli bir hesapla giriş yap' });
@@ -677,7 +677,7 @@ app.post('/api/idle', (req, res) => {
     if (appIds && Array.isArray(appIds) && appIds.length > 0) {
         ids = appIds.slice(0, 32).map(Number);
     } else {
-        ids = [730]; // Varsayılan CS2
+        ids = [730];
     }
 
     try {
@@ -685,7 +685,6 @@ app.post('/api/idle', (req, res) => {
             acc.client.setPersona(SteamUser.EPersonaState.Online);
         } catch (e) {}
 
-        // force: false veriyoruz ki kullanıcının kendi PC'sindeki oyununu kicklemesin!
         acc.client.gamesPlayed(ids, false);
         acc.games = ids;
         acc.startTime = Date.now();
@@ -700,12 +699,12 @@ app.post('/api/idle', (req, res) => {
 app.post('/api/stop', (req, res) => {
     const { username } = req.body;
 
-    let acc = null;
-    if (username) {
-        acc = accounts.get(String(username).toLowerCase().trim());
-    } else {
-        acc = accounts.values().next().value;
+    if (!username) {
+        return res.json({ success: false, error: 'Kullanıcı adı gerekli' });
     }
+
+    const key = String(username).toLowerCase().trim();
+    const acc = accounts.get(key);
 
     if (acc && acc.client && acc.loggedIn) {
         acc.client.gamesPlayed([]);
@@ -716,16 +715,22 @@ app.post('/api/stop', (req, res) => {
     res.json({ success: true });
 });
 
-// 9. Tüm hesaplarda idle başlat
+// 9. Sadece istemcinin kendi hesaplarında idle başlat
 app.post('/api/idle-all', (req, res) => {
-    const { appIds } = req.body;
+    const { usernames, appIds } = req.body;
+    if (!usernames || !Array.isArray(usernames) || usernames.length === 0) {
+        return res.json({ success: false, error: 'Kullanıcı adları gerekli' });
+    }
+
     const ids = (appIds && Array.isArray(appIds) && appIds.length > 0)
         ? appIds.slice(0, 32).map(Number)
         : [730];
 
     let count = 0;
-    for (const acc of accounts.values()) {
-        if (acc.loggedIn && acc.client) {
+    for (const u of usernames) {
+        const key = String(u).toLowerCase().trim();
+        const acc = accounts.get(key);
+        if (acc && acc.loggedIn && acc.client) {
             try {
                 try {
                     acc.client.setPersona(SteamUser.EPersonaState.Online);
@@ -740,11 +745,18 @@ app.post('/api/idle-all', (req, res) => {
     res.json({ success: true, count, games: ids });
 });
 
-// 10. Tüm hesaplarda idle durdur
+// 10. Sadece istemcinin kendi hesaplarında idle durdur
 app.post('/api/stop-all', (req, res) => {
+    const { usernames } = req.body;
+    if (!usernames || !Array.isArray(usernames) || usernames.length === 0) {
+        return res.json({ success: false, error: 'Kullanıcı adları gerekli' });
+    }
+
     let count = 0;
-    for (const acc of accounts.values()) {
-        if (acc.loggedIn && acc.client) {
+    for (const u of usernames) {
+        const key = String(u).toLowerCase().trim();
+        const acc = accounts.get(key);
+        if (acc && acc.loggedIn && acc.client) {
             try {
                 acc.client.gamesPlayed([]);
                 acc.games = [];

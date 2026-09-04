@@ -1137,23 +1137,32 @@
 
         async function masterStartIdleAll() {
             if (accountsList.length === 0) return;
-            if (!confirm('Tüm açık hesaplarda aynı anda saat kasma başlatılsın mı?')) return;
+            if (!confirm('Tüm açık hesaplarında aynı anda saat kasma başlatılsın mı?')) return;
+
+            const usernames = accountsList.map(a => a.username);
 
             try {
                 await fetch('/api/idle-all', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ appIds: [730] })
+                    body: JSON.stringify({ usernames, appIds: [730] })
                 });
                 await loadAccounts(activeUsername);
             } catch (e) {}
         }
 
         async function masterStopIdleAll() {
-            if (!confirm('Tüm hesaplardaki saat kasma durdurulsun mu?')) return;
+            if (accountsList.length === 0) return;
+            if (!confirm('Tüm hesaplarındaki saat kasma durdurulsun mu?')) return;
+
+            const usernames = accountsList.map(a => a.username);
 
             try {
-                await fetch('/api/stop-all', { method: 'POST' });
+                await fetch('/api/stop-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernames })
+                });
                 await loadAccounts(activeUsername);
             } catch (e) {}
         }
