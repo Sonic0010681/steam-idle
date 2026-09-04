@@ -750,17 +750,23 @@
         // ============================================================
         function setTheme(themeName) {
             document.body.className = themeName;
-            localStorage.setItem('steam_idle_theme', themeName);
+            try { localStorage.setItem('steam_idle_theme', themeName); } catch (e) {}
             document.querySelectorAll('.theme-pill').forEach(p => p.classList.remove('active'));
-            if (themeName === 'theme-cyber') document.querySelector('.pill-cyber').classList.add('active');
-            if (themeName === 'theme-cyberpunk') document.querySelector('.pill-cyberpunk').classList.add('active');
-            if (themeName === 'theme-crimson') document.querySelector('.pill-crimson').classList.add('active');
-            if (themeName === 'theme-synthwave') document.querySelector('.pill-synthwave').classList.add('active');
-            if (themeName === 'theme-matrix') document.querySelector('.pill-matrix').classList.add('active');
+            const map = {
+                'theme-cyber': '.pill-cyber',
+                'theme-cyberpunk': '.pill-cyberpunk',
+                'theme-crimson': '.pill-crimson',
+                'theme-synthwave': '.pill-synthwave',
+                'theme-matrix': '.pill-matrix'
+            };
+            const selector = map[themeName];
+            if (selector) {
+                const el = document.querySelector(selector);
+                if (el) el.classList.add('active');
+            }
         }
 
         const savedTheme = localStorage.getItem('steam_idle_theme') || 'theme-cyber';
-        setTheme(savedTheme);
 
         // ============================================================
         // LOGIN MODE SWITCHER & 60s QR AUTO REFRESH
@@ -1415,18 +1421,39 @@
         }
 
         // ============================================================
-        // INIT
+        // INIT & EVENT LISTENERS
         // ============================================================
+        window.switchLoginMode = switchLoginMode;
+        window.startQrLoginFlow = startQrLoginFlow;
+        window.showAddAccountView = showAddAccountView;
+        window.submitLogin = submitLogin;
+        window.submitSteamGuard = submitSteamGuard;
+        window.masterStartIdleAll = masterStartIdleAll;
+        window.masterStopIdleAll = masterStopIdleAll;
+        window.setTheme = setTheme;
+        window.openLeaderboardModal = openLeaderboardModal;
+        window.closeLeaderboardModal = closeLeaderboardModal;
+        window.toggleIdle = toggleIdle;
+        window.logoutAccount = logoutAccount;
+        window.editCustomNickname = editCustomNickname;
+        window.changePersonaState = changePersonaState;
+        window.switchGameTab = switchGameTab;
+        window.addCustomAppId = addCustomAppId;
+
         async function init() {
+            setTheme(savedTheme);
             await loadPopularGames();
             await loadAccounts();
             startPolling();
         }
 
-        init();
-
-        document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-        document.getElementById('guardCode').addEventListener('keydown', e => { if (e.key === 'Enter') submitSteamGuard(); });
+        window.addEventListener('DOMContentLoaded', () => {
+            init();
+            const passInput = document.getElementById('loginPassword');
+            if (passInput) passInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+            const guardInput = document.getElementById('guardCode');
+            if (guardInput) guardInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitSteamGuard(); });
+        });
     </script>
 </body>
 </html>
