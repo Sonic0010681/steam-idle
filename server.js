@@ -56,6 +56,7 @@ function getOrCreateAccount(sessionId, username) {
         key,
         sessionId,
         username,
+        nickname: null,            // Özel takma ad (örn: "Ana Hesabım")
         persona: null,
         steamID: null,
         loggedIn: false,
@@ -63,9 +64,14 @@ function getOrCreateAccount(sessionId, username) {
         steamGuardType: null,
         pendingSteamGuardCallback: null,
         error: null,
-        games: [],        // Şu an kasılan appId'ler
-        ownedGames: [],   // Hesabın sahip olduğu çekilen oyunlar [{ appId, name }]
+        personaState: SteamUser.EPersonaState.Online, // 1: Online, 7: Invisible, 3: Away, 4: Busy
+        games: [],                 // Kasılan appId'ler
+        ownedGames: [],            // Sahip olunan oyunlar
         startTime: null,
+        totalIdleSeconds: 0,       // Toplam idle süresi (saniye)
+        dailySeconds: 0,           // Günlük idle süresi (saniye)
+        weeklySeconds: 0,          // Haftalık idle süresi (saniye)
+        monthlySeconds: 0,         // Aylık idle süresi (saniye)
         client: null
     };
 
@@ -78,6 +84,18 @@ function getOrCreateAccount(sessionId, username) {
 
     return acc;
 }
+
+// 1 Saniyelik ZAMAN SÜRESİ İLERLETME SAYAÇI (Analiz & Saat Takibi)
+setInterval(() => {
+    for (const acc of accounts.values()) {
+        if (acc.loggedIn && acc.games && acc.games.length > 0) {
+            acc.totalIdleSeconds = (acc.totalIdleSeconds || 0) + 1;
+            acc.dailySeconds = (acc.dailySeconds || 0) + 1;
+            acc.weeklySeconds = (acc.weeklySeconds || 0) + 1;
+            acc.monthlySeconds = (acc.monthlySeconds || 0) + 1;
+        }
+    }
+}, 1000);
 
 function createSteamClientForAccount(acc) {
     if (acc.client) {
@@ -102,7 +120,7 @@ function createSteamClientForAccount(acc) {
         if (!acc.startTime) acc.startTime = Date.now();
 
         try {
-            client.setPersona(SteamUser.EPersonaState.Online);
+            client.setPersona(acc.personaState || SteamUser.EPersonaState.Online);
         } catch (e) {}
     });
 
@@ -180,14 +198,41 @@ function getSteamErrorMessage(err) {
     return messages[err.eresult] || err.message || 'Bilinmeyen hata';
 }
 
+// Helper: Liderlik Tablosu Oluştur
+function getLeaderboardForSession(sessionId) {
+    const keys = sessionAccounts.get(sessionId) || new Set();
+    const list = [];
+
+    for (const key of keys) {
+        const acc = accounts.get(key);
+        if (!acc) continue;
+
+        list.push({
+            username: acc.username,
+            nickname: acc.nickname,
+            persona: acc.persona || acc.username,
+            totalIdleSeconds: acc.totalIdleSeconds || 0,
+            dailySeconds: acc.dailySeconds || 0,
+            weeklySeconds: acc.weeklySeconds || 0,
+            monthlySeconds: acc.monthlySeconds || 0,
+            isIdling: acc.games.length > 0,
+            activeGamesCount: acc.games.length
+        });
+    }
+
+    // Toplam saat kasma süresine göre azalan sıralama (En çok kasan 1.)
+    list.sort((a, b) => b.totalIdleSeconds - a.totalIdleSeconds);
+    return list;
+}
+
 // ============================================================
 // API ROUTES
 // ============================================================
 
-// Oturuma ait tüm hesapların durum listesini getir
+// Oturuma ait tüm hesapların durum listesini ve liderlik sıralamasını getir
 app.get('/api/session/accounts', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.query.sid;
-    if (!sessionId) return res.json({ success: true, accounts: [] });
+    if (!sessionId) return res.json({ success: true, accounts: [], leaderboard: [] });
 
     const keys = sessionAccounts.get(sessionId) || new Set();
     const result = [];
@@ -199,24 +244,31 @@ app.get('/api/session/accounts', (req, res) => {
         const uptime = acc.startTime ? Math.floor((Date.now() - acc.startTime) / 1000) : 0;
         result.push({
             username: acc.username,
+            nickname: acc.nickname,
             persona: acc.persona || acc.username,
             steamID: acc.steamID,
             loggedIn: acc.loggedIn,
             steamGuardNeeded: acc.steamGuardNeeded,
             steamGuardType: acc.steamGuardType,
+            personaState: acc.personaState,
             isIdling: acc.games.length > 0,
             activeGamesCount: acc.games.length,
             activeGames: acc.games,
             ownedGamesCount: acc.ownedGames.length,
+            totalIdleSeconds: acc.totalIdleSeconds,
+            dailySeconds: acc.dailySeconds,
+            weeklySeconds: acc.weeklySeconds,
+            monthlySeconds: acc.monthlySeconds,
             error: acc.error,
             uptime
         });
     }
 
-    res.json({ success: true, accounts: result });
+    const leaderboard = getLeaderboardForSession(sessionId);
+    res.json({ success: true, accounts: result, leaderboard });
 });
 
-// Belirli bir hesabın detaylı durumunu getir (oyun listesi dahil)
+// Belirli bir hesabın detaylı durumunu getir
 app.get('/api/account/status', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.query.sid;
     const username = req.query.username;
@@ -235,14 +287,20 @@ app.get('/api/account/status', (req, res) => {
     res.json({
         success: true,
         username: acc.username,
+        nickname: acc.nickname,
         persona: acc.persona || acc.username,
         steamID: acc.steamID,
         loggedIn: acc.loggedIn,
         steamGuardNeeded: acc.steamGuardNeeded,
         steamGuardType: acc.steamGuardType,
+        personaState: acc.personaState,
         error: acc.error,
         games: acc.games,
         ownedGames: acc.ownedGames,
+        totalIdleSeconds: acc.totalIdleSeconds,
+        dailySeconds: acc.dailySeconds,
+        weeklySeconds: acc.weeklySeconds,
+        monthlySeconds: acc.monthlySeconds,
         uptime
     });
 });
@@ -348,7 +406,98 @@ app.post('/api/account/steamguard', (req, res) => {
     }, 500);
 });
 
-// Idle Başlat
+// Özel Takma Ad (Nickname) Belirle
+app.post('/api/account/nickname', (req, res) => {
+    const sessionId = req.headers['x-session-id'] || req.body.sid;
+    const { username, nickname } = req.body;
+
+    if (!sessionId || !username) {
+        return res.json({ success: false, error: 'Oturum ve kullanıcı adı gerekli' });
+    }
+
+    const key = getAccountKey(sessionId, username);
+    const acc = accounts.get(key);
+    if (acc) {
+        acc.nickname = nickname ? nickname.trim() : null;
+        return res.json({ success: true, nickname: acc.nickname });
+    }
+    res.json({ success: false, error: 'Hesap bulunamadı' });
+});
+
+// Steam Durum Modu Değiştir (Çevrimiçi / Görünmez (Invisible) / Dışarıda / Meşgul)
+app.post('/api/account/personastate', (req, res) => {
+    const sessionId = req.headers['x-session-id'] || req.body.sid;
+    const { username, personaState } = req.body;
+
+    if (!sessionId || !username || personaState === undefined) {
+        return res.json({ success: false, error: 'Eksik parametre' });
+    }
+
+    const key = getAccountKey(sessionId, username);
+    const acc = accounts.get(key);
+    if (acc && acc.client && acc.loggedIn) {
+        acc.personaState = Number(personaState);
+        try {
+            acc.client.setPersona(acc.personaState);
+            console.log(`🥷 [${acc.username}] Steam Durumu güncellendi: ${acc.personaState}`);
+            return res.json({ success: true, personaState: acc.personaState });
+        } catch (e) {
+            return res.json({ success: false, error: e.message });
+        }
+    }
+    res.json({ success: false, error: 'Hesap çevrimiçi değil' });
+});
+
+// MASTER CONTROL 1: TEK TIKLA TÜM HESAPLARDA IDLE BAŞLAT
+app.post('/api/session/idle-all', (req, res) => {
+    const sessionId = req.headers['x-session-id'] || req.body.sid;
+    const { appIds } = req.body; // Örn: [730] veya seçilenler
+
+    if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
+
+    const keys = sessionAccounts.get(sessionId) || new Set();
+    const ids = (appIds && Array.isArray(appIds) && appIds.length > 0) ? appIds.slice(0, 32).map(Number) : [730];
+
+    let startedCount = 0;
+    for (const key of keys) {
+        const acc = accounts.get(key);
+        if (acc && acc.loggedIn && acc.client) {
+            try {
+                acc.client.gamesPlayed(ids);
+                acc.games = ids;
+                acc.startTime = Date.now();
+                startedCount++;
+            } catch (e) {}
+        }
+    }
+
+    console.log(`🚀 [Master Control] ${startedCount} adet hesapta toplu idle başlatıldı: ${ids.join(', ')}`);
+    res.json({ success: true, count: startedCount, games: ids });
+});
+
+// MASTER CONTROL 2: TEK TIKLA TÜM HESAPLARDA IDLE DURDUR
+app.post('/api/session/stop-all', (req, res) => {
+    const sessionId = req.headers['x-session-id'] || req.body.sid;
+    if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
+
+    const keys = sessionAccounts.get(sessionId) || new Set();
+    let stoppedCount = 0;
+    for (const key of keys) {
+        const acc = accounts.get(key);
+        if (acc && acc.loggedIn && acc.client) {
+            try {
+                acc.client.gamesPlayed([]);
+                acc.games = [];
+                stoppedCount++;
+            } catch (e) {}
+        }
+    }
+
+    console.log(`⏹ [Master Control] ${stoppedCount} adet hesapta idle durduruldu.`);
+    res.json({ success: true, count: stoppedCount });
+});
+
+// Idle Başlat (Tekil)
 app.post('/api/account/idle', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username, appIds } = req.body;
@@ -381,7 +530,7 @@ app.post('/api/account/idle', (req, res) => {
     }
 });
 
-// Idle Durdur
+// Idle Durdur (Tekil)
 app.post('/api/account/stop', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username } = req.body;
@@ -435,12 +584,14 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════╗
-║ 🎮 STEAM IDLE MULTI-ACCOUNT - SAAT KASICI                ║
+║ 🎮 STEAM IDLE PRO MASTER - SAAT KASICI & ANALİZ          ║
 ║ http://localhost:${PORT}                                   ║
 ║                                                          ║
-║ ⚡ Çoklu Steam Hesabı Desteği Aktif!                      ║
-║ ⚡ Her ziyaretçi kendi hesabını ekleyebilir!               ║
-║ ⚡ PC Kapalıyken 7/24 Saat Kasar!                        ║
+║ ⚡ 1. Tek Tıkla Tüm Hesaplarda Saat Kasma (Master)       ║
+║ ⚡ 3. Görünmez (Invisible) & Gizli Modda Saat Kasma      ║
+║ ⚡ 🎨 RGB / Cyberpunk / Synthwave Temaları               ║
+║ ⚡ 📊 Günlük/Haftalık/Aylık/Yıllık Saat Analizi          ║
+║ ⚡ 🏆 Canlı Liderlik Tablosu (En çok saat kasan 1.)       ║
 ╚══════════════════════════════════════════════════════════╝
     `);
 });
