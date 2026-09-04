@@ -778,6 +778,8 @@
             if (qrPollingInterval) clearInterval(qrPollingInterval);
             if (qrCountdownInterval) clearInterval(qrCountdownInterval);
 
+            showView('addAccountView');
+
             const passBtn = document.getElementById('loginTabPass');
             const qrBtn = document.getElementById('loginTabQR');
             const passMode = document.getElementById('loginPassMode');
@@ -1017,7 +1019,7 @@
                         showView('accountDashboardView');
                         updateDashboardUI();
                     } else if (data.error) {
-                        showAddAccountView();
+                        showAddAccountView(true);
                         document.getElementById('loginErrorMsg').innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
                     }
                 }
