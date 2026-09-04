@@ -12,16 +12,33 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================================
 // ============================================================
-// HESAP KAYDI DEVRE DIŞI (GÜVENLİK & TEMİZ BAŞLANGIÇ)
+// KALICI OTURUM YÖNETİMİ (SESSIONS.JSON)
 // ============================================================
-// Kullanıcı hesapları diske kaydedilmez. Herkes siteye girdiğinde 
-// sıfırdan kendi hesabını ekler ve kullanır.
+const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
+
 function saveAccountSession(username, refreshToken) {
-    // Güvenlik gereği hesabı diske kaydetme
+    if (!username || !refreshToken) return;
+    let data = {};
+    try {
+        if (fs.existsSync(SESSIONS_FILE)) {
+            data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+        }
+    } catch (e) {}
+    data[username.toLowerCase()] = { username, refreshToken, lastSaved: Date.now() };
+    try {
+        fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {}
 }
 
 function removeAccountSession(username) {
-    // Diskte kayıt tutulmuyor
+    if (!username) return;
+    try {
+        if (fs.existsSync(SESSIONS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+            delete data[username.toLowerCase()];
+            fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2));
+        }
+    } catch (e) {}
 }
 
 // ============================================================
@@ -297,65 +314,109 @@ setInterval(() => {
 }, 1000);
 
 function loadSavedSessions() {
-    // Hiçbir hesabı otomatik yükleme - Herkes siteye girip kendi hesabını ekler.
+    try {
+        const files = ['sessions.json', 'session.json', 'sessions.js', 'session.js'];
+        for (const file of files) {
+            const filePath = path.join(__dirname, file);
+            if (fs.existsSync(filePath)) {
+                try {
+                    let content = fs.readFileSync(filePath, 'utf8');
+                    if (content.includes('module.exports') || content.includes('exports.')) {
+                        content = content.replace(/module\.exports\s*=\s*/, '').replace(/;?\s*$/, '');
+                    }
+                    const data = JSON.parse(content);
+                    if (data && typeof data === 'object') {
+                        const sessionsObj = (data.username || data.refreshToken || data.token) ? { [data.username || 'user']: data } : data;
+                        for (const [key, sess] of Object.entries(sessionsObj)) {
+                            if (sess && (sess.refreshToken || sess.token)) {
+                                const username = sess.username || sess.accountName || key;
+                                const token = sess.refreshToken || sess.token;
+                                console.log(`🔄 Kayıtlı oturum geri yükleniyor (${file}): ${username}`);
+                                const acc = getOrCreateAccount(username);
+                                acc.refreshToken = token;
+                                const client = createSteamClientForAccount(acc);
+                                client.logOn({ refreshToken: token, logonID: getLogonID(username) });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Oturum dosyası okuma hatası (${file}):`, e.message);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Kayıtlı oturumlar yüklenirken hata:', e.message);
+    }
 }
 
 // ============================================================
 // API ROUTES
 // ============================================================
 
-// 1. İstemcinin sahip olduğu hesapların durumunu listele (Sadece talep edilen kullanıcı adları)
-app.post('/api/accounts', (req, res) => {
-    const { usernames } = req.body;
-    if (!usernames || !Array.isArray(usernames) || usernames.length === 0) {
-        return res.json({ success: true, accounts: [] });
-    }
-
+// 1. Tüm hesapları listele (Direkt yanıt verir)
+app.get('/api/accounts', (req, res) => {
     const list = [];
-    for (const u of usernames) {
-        const key = String(u).toLowerCase().trim();
-        const acc = accounts.get(key);
-        if (acc) {
-            const uptime = (acc.startTime && acc.games && acc.games.length > 0)
-                ? Math.floor((Date.now() - acc.startTime) / 1000)
-                : 0;
-            list.push({
-                username: acc.username,
-                persona: acc.persona || acc.username,
-                steamID: acc.steamID,
-                loggedIn: acc.loggedIn,
-                playingBlocked: acc.playingBlocked || false,
-                blockedByApp: acc.blockedByApp || null,
-                steamGuardNeeded: acc.steamGuardNeeded,
-                steamGuardType: acc.steamGuardType,
-                games: acc.games || [],
-                ownedGamesCount: acc.ownedGames ? acc.ownedGames.length : 0,
-                error: acc.error,
-                uptime: uptime,
-                totalSeconds: acc.totalSeconds || 0
-            });
-        }
+    for (const acc of accounts.values()) {
+        const uptime = (acc.startTime && acc.games && acc.games.length > 0)
+            ? Math.floor((Date.now() - acc.startTime) / 1000)
+            : 0;
+        list.push({
+            username: acc.username,
+            persona: acc.persona || acc.username,
+            steamID: acc.steamID,
+            loggedIn: acc.loggedIn,
+            playingBlocked: acc.playingBlocked || false,
+            blockedByApp: acc.blockedByApp || null,
+            steamGuardNeeded: acc.steamGuardNeeded,
+            steamGuardType: acc.steamGuardType,
+            games: acc.games || [],
+            ownedGamesCount: acc.ownedGames ? acc.ownedGames.length : 0,
+            error: acc.error,
+            uptime: uptime,
+            totalSeconds: acc.totalSeconds || 0
+        });
     }
     res.json({ success: true, accounts: list });
 });
 
-// GET /api/accounts geriye dönük uyumluluk - Parametresiz çağrılırsa boş liste döner!
-app.get('/api/accounts', (req, res) => {
-    res.json({ success: true, accounts: [] });
+app.post('/api/accounts', (req, res) => {
+    const list = [];
+    for (const acc of accounts.values()) {
+        const uptime = (acc.startTime && acc.games && acc.games.length > 0)
+            ? Math.floor((Date.now() - acc.startTime) / 1000)
+            : 0;
+        list.push({
+            username: acc.username,
+            persona: acc.persona || acc.username,
+            steamID: acc.steamID,
+            loggedIn: acc.loggedIn,
+            playingBlocked: acc.playingBlocked || false,
+            blockedByApp: acc.blockedByApp || null,
+            steamGuardNeeded: acc.steamGuardNeeded,
+            steamGuardType: acc.steamGuardType,
+            games: acc.games || [],
+            ownedGamesCount: acc.ownedGames ? acc.ownedGames.length : 0,
+            error: acc.error,
+            uptime: uptime,
+            totalSeconds: acc.totalSeconds || 0
+        });
+    }
+    res.json({ success: true, accounts: list });
 });
 
-// 2. Tek bir hesabın durumunu sorgula (Sadece kullanıcı adı belirtilmişse!)
+// 2. Hesabın durumunu sorgula (Varsayılan olarak aktif ilk hesabı veya istenen hesabı açar)
 app.get('/api/status', (req, res) => {
     const username = req.query.username;
 
-    if (!username) {
-        return res.json({ loggedIn: false });
+    let acc = null;
+    if (username) {
+        acc = accounts.get(String(username).toLowerCase().trim());
+    } else {
+        acc = accounts.values().next().value;
     }
 
-    const key = String(username).toLowerCase().trim();
-    const acc = accounts.get(key);
     if (!acc) {
-        return res.json({ loggedIn: false });
+        return res.json({ loggedIn: false, accountsCount: 0 });
     }
 
     const uptime = (acc.startTime && acc.games && acc.games.length > 0)

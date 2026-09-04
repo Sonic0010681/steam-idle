@@ -827,30 +827,31 @@
         // ============================================================
         async function loadAccounts(selectUser = null) {
             try {
-                let saved = JSON.parse(localStorage.getItem('mySteamIdleAccounts') || '{}');
-                const userSet = new Set(Object.keys(saved));
-                if (selectUser) userSet.add(String(selectUser).toLowerCase());
-                const usernames = Array.from(userSet);
-
-                const res = await fetch('/api/accounts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ usernames })
-                });
+                // 1. Sunucudaki aktif tüm hesapları ve durumları al
+                const res = await fetch('/api/accounts');
                 const data = await res.json();
                 accountsList = data.accounts || [];
 
+                // 2. Ayrıca genel durumu sorgula (Sunucu tek/ilk aktif hesabı döner)
+                const statusRes = await fetch('/api/status');
+                const statusData = await statusRes.json();
+
                 renderAccountsBar();
 
-                if (accountsList.length > 0) {
-                    const target = selectUser || activeUsername || accountsList[0].username;
-                    selectAccount(target);
-                } else if (selectUser) {
+                if (selectUser) {
                     selectAccount(selectUser);
+                } else if (accountsList.length > 0) {
+                    const target = activeUsername || accountsList[0].username;
+                    selectAccount(target);
+                } else if (statusData && statusData.username) {
+                    saveClientAccountSession(statusData.username, 'active');
+                    selectAccount(statusData.username);
                 } else {
                     showAddAccountScreen();
                 }
-            } catch (e) {}
+            } catch (e) {
+                showAddAccountScreen();
+            }
         }
 
         function renderAccountsBar() {
