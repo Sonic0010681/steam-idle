@@ -903,22 +903,19 @@
             document.getElementById(viewId).classList.add('active');
         }
 
-        function showAddAccountView() {
+        function showAddAccountView(preserveError = false) {
             activeUsername = null;
             renderSidebar();
             showView('addAccountView');
             startQrLoginFlow();
-            const errDiv = document.getElementById('loginErrorMsg');
-            if (errDiv) errDiv.innerHTML = '';
+            if (!preserveError) {
+                const errDiv = document.getElementById('loginErrorMsg');
+                if (errDiv) errDiv.innerHTML = '';
+            }
         }
 
         function showQrAddAccountView() {
-            activeUsername = null;
-            renderSidebar();
-            showView('addAccountView');
-            switchLoginMode('qr');
-            const errDiv = document.getElementById('loginErrorMsg');
-            if (errDiv) errDiv.innerHTML = '';
+            showAddAccountView();
         }
 
         // ============================================================
@@ -991,6 +988,13 @@
                 `;
                 container.appendChild(card);
             });
+
+            // Alt tarafa belirgin YENİ HESAP EKLE butonu
+            const addBtn = document.createElement('button');
+            addBtn.className = 'btn-add-full';
+            addBtn.onclick = () => showAddAccountView();
+            addBtn.innerHTML = '➕ YENİ HESAP EKLE';
+            container.appendChild(addBtn);
         }
 
         async function selectAccount(username) {
@@ -1462,6 +1466,8 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             init();
+            const userInput = document.getElementById('loginUsername');
+            if (userInput) userInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
             const passInput = document.getElementById('loginPassword');
             if (passInput) passInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
             const guardInput = document.getElementById('guardCode');
