@@ -435,12 +435,14 @@
         .view-section { display: none; }
         .view-section.active { display: block; }
 
+        .login-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+
         @media (max-width: 850px) {
             .app-wrapper { flex-direction: column; }
             .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--card-border); padding: 18px; }
             .main-content { padding: 20px 14px; }
             .analytics-grid { grid-template-columns: repeat(2, 1fr); }
-            .login-tabs { flex-direction: column; }
+            .login-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -503,75 +505,72 @@
                 </button>
             </div>
 
-            <!-- VIEW 1: LOGIN WITH PASSWORD OR QR CODE -->
+            <!-- VIEW 1: LOGIN WITH PASSWORD OR QR CODE (DUAL VIEW - BOTH VISIBLE AT ONCE) -->
             <div class="view-section active" id="addAccountView">
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">🔐 Yeni Steam Hesabı Ekle</div>
                     </div>
 
-                    <!-- LOGIN TYPE TABS (Password vs QR Code) -->
-                    <div class="login-tabs">
-                        <button type="button" class="login-tab-btn active" id="loginTabQR" onclick="switchLoginMode('qr')">
-                            📱 QR KOD İLE GİRİŞ
-                        </button>
-                        <button type="button" class="login-tab-btn" id="loginTabPass" onclick="switchLoginMode('password')">
-                            🔑 Şifre İle Manuel Giriş Yap
-                        </button>
-                    </div>
+                    <div class="login-grid">
+                        <!-- LEFT COLUMN: QR CODE LOGIN -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); border-radius: 16px; padding: 20px; text-align: center;">
+                            <div style="font-family: 'Orbitron', monospace; font-size: 0.85rem; font-weight: 800; color: var(--neon-primary); margin-bottom: 14px; text-transform: uppercase;">
+                                📱 1. YÖNTEM: QR KOD İLE GİRİŞ
+                            </div>
 
-                    <!-- MODE 1: QR CODE SCANNER FORM (DEFAULT) -->
-                    <div id="loginQRMode" style="display: block;">
-                        <div class="qr-container">
-                            <div class="qr-img-box" id="qrBox">
-                                <div class="qr-scan-line"></div>
-                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
-                                    <span class="spinner" style="width: 36px; height: 36px; border-width: 3px;"></span>
-                                    <span style="font-size: 0.8rem; color: var(--neon-primary); font-weight: 600;">Steam QR Kodu Oluşturuluyor...</span>
+                            <div class="qr-container" style="padding: 16px; margin-bottom: 12px;">
+                                <div class="qr-img-box" id="qrBox" style="min-width: 200px; min-height: 200px; width: 200px; height: 200px; margin: 0 auto 12px auto;">
+                                    <div class="qr-scan-line"></div>
+                                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+                                        <span class="spinner" style="width: 32px; height: 32px; border-width: 3px;"></span>
+                                        <span style="font-size: 0.75rem; color: var(--neon-primary); font-weight: 600;">QR Kod Yükleniyor...</span>
+                                    </div>
+                                </div>
+
+                                <div id="qrStatusMsg" style="text-align: center;">
+                                    <div style="font-size: 0.82rem; font-weight: 700; color: var(--neon-primary);">
+                                        📱 Steam Uygulamasından QR Kodunu Okutun!
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                                        ⏱️ Yenileniyor: <strong style="color: var(--gold);" id="qrTimerVal">60s</strong>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="qr-instructions">
-                                <strong style="color: var(--neon-primary); font-size: 0.95rem;">📱 Steam Mobil Uygulaması İle Tara:</strong>
-                                <ol>
-                                    <li>Telefonunuzdan <strong>Steam Mobil Uygulamasını</strong> açın.</li>
-                                    <li>Alt kısımdaki <strong>Steam Guard (Kalkan)</strong> simgesine dokunun.</li>
-                                    <li><strong>QR Kodu Tara (Kamera)</strong> seçeneğini seçin ve yukarıdaki kodu okutun!</li>
-                                </ol>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; text-align: left;">
+                                1. Telefonunuzdan <strong>Steam Uygulamasını</strong> açın.<br>
+                                2. <strong>Steam Guard (Kalkan)</strong> simgesine dokunun.<br>
+                                3. <strong>QR Kodu Tara</strong> diyerek yukarıdaki kodu okutun!
                             </div>
                         </div>
 
-                        <div id="qrStatusMsg" style="text-align: center; margin-top: 10px;">
-                            <div style="font-size: 0.9rem; font-weight: 700; color: var(--neon-primary);">
-                                📱 Steam Mobil Uygulamasından QR Kodunu Okutun!
+                        <!-- RIGHT COLUMN: MANUAL USERNAME & PASSWORD LOGIN -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 20px;">
+                            <div style="font-family: 'Orbitron', monospace; font-size: 0.85rem; font-weight: 800; color: var(--neon-primary); margin-bottom: 14px; text-transform: uppercase;">
+                                🔑 2. YÖNTEM: ŞİFRE İLE MANUEL GİRİŞ
                             </div>
-                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
-                                ⏱️ QR Kod Yenileniyor: <strong style="color: var(--gold);" id="qrTimerVal">60s</strong>
+
+                            <div class="warn-msg" style="font-size: 0.78rem; margin-bottom: 14px; padding: 10px;">
+                                ⚡ Bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
                             </div>
+
+                            <div id="loginErrorMsg"></div>
+
+                            <div class="form-group">
+                                <label>Steam Kullanıcı Adı</label>
+                                <input type="text" id="loginUsername" placeholder="Kullanıcı adını gir..." autocomplete="off">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Şifre</label>
+                                <input type="password" id="loginPassword" placeholder="Şifreni gir...">
+                            </div>
+
+                            <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()" style="margin-top: 10px;">
+                                GİRİŞ YAP VE HESABI EKLE
+                            </button>
                         </div>
-                    </div>
-
-                    <!-- MODE 2: PASSWORD FORM -->
-                    <div id="loginPassMode" style="display: none;">
-                        <div class="warn-msg">
-                            ⚡ Siteye giren herkes kendi hesabını ekleyebilir. Giriş bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
-                        </div>
-
-                        <div id="loginErrorMsg"></div>
-
-                        <div class="form-group">
-                            <label>Steam Kullanıcı Adı</label>
-                            <input type="text" id="loginUsername" placeholder="Steam kullanıcı adını gir..." autocomplete="off">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Şifre</label>
-                            <input type="password" id="loginPassword" placeholder="Şifreni gir...">
-                        </div>
-
-                        <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()">
-                            GİRİŞ YAP VE HESABI EKLE
-                        </button>
                     </div>
                 </div>
             </div>
@@ -904,15 +903,11 @@
             document.getElementById(viewId).classList.add('active');
         }
 
-        function showAddAccountView(preserveMode = false) {
+        function showAddAccountView() {
             activeUsername = null;
             renderSidebar();
             showView('addAccountView');
-            if (preserveMode) {
-                switchLoginMode(currentLoginMode);
-            } else {
-                switchLoginMode('qr');
-            }
+            startQrLoginFlow();
             const errDiv = document.getElementById('loginErrorMsg');
             if (errDiv) errDiv.innerHTML = '';
         }
