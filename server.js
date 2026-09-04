@@ -266,29 +266,35 @@ app.post('/api/account/login', (req, res) => {
         password: password
     });
 
+    let responded = false;
+    const sendResponse = (payload) => {
+        if (responded || res.headersSent) return;
+        responded = true;
+        clearTimeout(timeout);
+        clearInterval(checkInterval);
+        res.json(payload);
+    };
+
     const timeout = setTimeout(() => {
         if (acc.steamGuardNeeded) {
-            res.json({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
+            sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
         } else if (acc.error) {
-            res.json({ success: false, error: acc.error });
+            sendResponse({ success: false, error: acc.error });
         } else if (acc.loggedIn) {
-            res.json({ success: true, username: acc.username });
+            sendResponse({ success: true, username: acc.username });
         } else {
-            res.json({ success: false, error: 'Bağlantı zaman aşımına uğradı' });
+            sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı' });
         }
     }, 10000);
 
     const checkInterval = setInterval(() => {
         if (acc.loggedIn || acc.error || acc.steamGuardNeeded) {
-            clearTimeout(timeout);
-            clearInterval(checkInterval);
-
             if (acc.steamGuardNeeded) {
-                res.json({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
+                sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
             } else if (acc.error) {
-                res.json({ success: false, error: acc.error });
+                sendResponse({ success: false, error: acc.error });
             } else {
-                res.json({ success: true, username: acc.username });
+                sendResponse({ success: true, username: acc.username });
             }
         }
     }, 500);
@@ -314,23 +320,29 @@ app.post('/api/account/steamguard', (req, res) => {
     acc.pendingSteamGuardCallback(code);
     acc.pendingSteamGuardCallback = null;
 
+    let responded = false;
+    const sendResponse = (payload) => {
+        if (responded || res.headersSent) return;
+        responded = true;
+        clearTimeout(timeout);
+        clearInterval(checkInterval);
+        res.json(payload);
+    };
+
     const timeout = setTimeout(() => {
         if (acc.loggedIn) {
-            res.json({ success: true, username: acc.username });
+            sendResponse({ success: true, username: acc.username });
         } else {
-            res.json({ success: false, error: acc.error || 'Giriş başarısız' });
+            sendResponse({ success: false, error: acc.error || 'Giriş başarısız' });
         }
     }, 8000);
 
     const checkInterval = setInterval(() => {
         if (acc.loggedIn || acc.error) {
-            clearTimeout(timeout);
-            clearInterval(checkInterval);
-
             if (acc.loggedIn) {
-                res.json({ success: true, username: acc.username });
+                sendResponse({ success: true, username: acc.username });
             } else {
-                res.json({ success: false, error: acc.error });
+                sendResponse({ success: false, error: acc.error });
             }
         }
     }, 500);
