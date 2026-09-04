@@ -993,9 +993,6 @@
             });
         }
 
-        // ============================================================
-        // SELECT ACCOUNT & DASHBOARD
-        // ============================================================
         async function selectAccount(username) {
             activeUsername = username;
             renderSidebar();
@@ -1016,6 +1013,10 @@
                     } else if (data.error) {
                         showAddAccountView(true);
                         document.getElementById('loginErrorMsg').innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
+                    } else {
+                        // Steam bağlantısı devam ediyorsa paneli açıp durum güncellenecek
+                        showView('accountDashboardView');
+                        updateDashboardUI();
                     }
                 }
             } catch (e) {}
@@ -1028,7 +1029,7 @@
             const displayName = acc.nickname ? `${acc.nickname} (${acc.persona || acc.username})` : (acc.persona || acc.username);
 
             document.getElementById('dashAvatar').textContent = displayName.charAt(0).toUpperCase();
-            document.getElementById('dashPersona').textContent = displayName;
+            document.getElementById('dashPersona').textContent = acc.loggedIn ? displayName : `${displayName} (⚡ Bağlanılıyor...)`;
             document.getElementById('dashSteamID').textContent = acc.steamID ? `SteamID: ${acc.steamID}` : `Kullanıcı: ${acc.username}`;
 
             if (acc.personaState !== undefined) {
@@ -1044,11 +1045,14 @@
             document.getElementById('analyticsMonth').textContent = ((acc.monthlySeconds || 0) / 3600).toFixed(1) + ' Sa';
             document.getElementById('analyticsTotal').textContent = formatSecondsLong(totSec);
 
-            document.getElementById('dashOwnedCount').textContent = acc.ownedGames ? acc.ownedGames.length : 0;
-            document.getElementById('countOwnedTab').textContent = acc.ownedGames ? acc.ownedGames.length : 0;
+            const ownedCount = (acc.ownedGames && acc.ownedGames.length > 0) ? acc.ownedGames.length : popularGames.length;
+            document.getElementById('dashOwnedCount').textContent = ownedCount;
+            document.getElementById('countOwnedTab').textContent = ownedCount;
 
             if (acc.games && acc.games.length > 0) {
                 acc.games.forEach(id => selectedAppIds.add(Number(id)));
+            } else if (selectedAppIds.size === 0) {
+                selectedAppIds.add(730); // Default CS2 (Counter-Strike 2)
             }
 
             const idleBtn = document.getElementById('btnIdleControl');
@@ -1279,7 +1283,7 @@
             container.innerHTML = '';
 
             let listToRender = [];
-            if (currentTab === 'owned' && activeAccountData && activeAccountData.ownedGames) {
+            if (currentTab === 'owned' && activeAccountData && activeAccountData.ownedGames && activeAccountData.ownedGames.length > 0) {
                 listToRender = activeAccountData.ownedGames;
             } else {
                 listToRender = popularGames;
@@ -1292,9 +1296,7 @@
             }
 
             if (listToRender.length === 0) {
-                container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 30px; font-size: 0.85rem;">
-                    ${currentTab === 'owned' ? 'Kütüphanede oyun bulunamadı veya henüz yükleniyor...' : 'Aranan oyun bulunamadı.'}
-                </div>`;
+                container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 30px; font-size: 0.85rem;">Aranan oyun bulunamadı.</div>`;
                 return;
             }
 
@@ -1397,24 +1399,38 @@
         function startPolling() {
             if (pollingInterval) clearInterval(pollingInterval);
             pollingInterval = setInterval(async () => {
-                if (activeUsername && document.getElementById('accountDashboardView').classList.contains('active')) {
+                if (activeUsername) {
                     const data = await apiFetch(`/api/account/status?username=${encodeURIComponent(activeUsername)}`);
                     if (data.success) {
+                        const prevOwnedCount = (activeAccountData && activeAccountData.ownedGames) ? activeAccountData.ownedGames.length : 0;
                         activeAccountData = data;
-                        const daySec = data.dailySeconds || 0;
-                        const weekSec = data.weeklySeconds || 0;
-                        const totSec = data.totalIdleSeconds || 0;
 
-                        document.getElementById('analyticsToday').textContent = formatSecondsShort(daySec);
-                        document.getElementById('analyticsWeek').textContent = (weekSec / 3600).toFixed(1) + ' Sa';
-                        document.getElementById('analyticsMonth').textContent = ((data.monthlySeconds || 0) / 3600).toFixed(1) + ' Sa';
-                        document.getElementById('analyticsTotal').textContent = formatSecondsLong(totSec);
+                        // Oturum bağlandıysa ve giriş/guard ekranındaysa otomatik paneli aç
+                        if (data.loggedIn && (document.getElementById('addAccountView').classList.contains('active') || document.getElementById('steamGuardView').classList.contains('active'))) {
+                            showView('accountDashboardView');
+                        }
 
-                        document.getElementById('dashOwnedCount').textContent = data.ownedGames ? data.ownedGames.length : 0;
-                        document.getElementById('countOwnedTab').textContent = data.ownedGames ? data.ownedGames.length : 0;
+                        if (document.getElementById('accountDashboardView').classList.contains('active')) {
+                            const daySec = data.dailySeconds || 0;
+                            const weekSec = data.weeklySeconds || 0;
+                            const totSec = data.totalIdleSeconds || 0;
+
+                            document.getElementById('analyticsToday').textContent = formatSecondsShort(daySec);
+                            document.getElementById('analyticsWeek').textContent = (weekSec / 3600).toFixed(1) + ' Sa';
+                            document.getElementById('analyticsMonth').textContent = ((data.monthlySeconds || 0) / 3600).toFixed(1) + ' Sa';
+                            document.getElementById('analyticsTotal').textContent = formatSecondsLong(totSec);
+
+                            const newOwnedCount = (data.ownedGames && data.ownedGames.length > 0) ? data.ownedGames.length : popularGames.length;
+                            document.getElementById('dashOwnedCount').textContent = newOwnedCount;
+                            document.getElementById('countOwnedTab').textContent = newOwnedCount;
+
+                            if (newOwnedCount !== prevOwnedCount) {
+                                renderGamesList();
+                            }
+                        }
                     }
                 }
-            }, 3000);
+            }, 2000);
         }
 
         // ============================================================

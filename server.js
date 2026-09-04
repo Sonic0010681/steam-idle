@@ -82,7 +82,10 @@ app.use((req, res, next) => {
         }
         for (const key in req.body) {
             if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                req.body[key] = sanitizeInput(req.body[key]);
+                // Şifre ve Steam Guard kodları asla sanitization işleminden geçirilmez
+                if (key !== 'password' && key !== 'code') {
+                    req.body[key] = sanitizeInput(req.body[key]);
+                }
             }
         }
     }
@@ -368,6 +371,8 @@ app.get('/api/account/status', (req, res) => {
     }
 
     const uptime = acc.startTime ? Math.floor((Date.now() - acc.startTime) / 1000) : 0;
+    const effectiveOwnedGames = (acc.ownedGames && acc.ownedGames.length > 0) ? acc.ownedGames : POPULAR_GAMES;
+
     res.json({
         success: true,
         username: acc.username,
@@ -380,7 +385,7 @@ app.get('/api/account/status', (req, res) => {
         personaState: acc.personaState,
         error: acc.error,
         games: acc.games,
-        ownedGames: acc.ownedGames,
+        ownedGames: effectiveOwnedGames,
         totalIdleSeconds: acc.totalIdleSeconds,
         dailySeconds: acc.dailySeconds,
         weeklySeconds: acc.weeklySeconds,
@@ -402,10 +407,6 @@ app.post('/api/account/login', (req, res) => {
     acc.steamGuardNeeded = false;
 
     const client = createSteamClientForAccount(acc);
-    client.logOn({
-        accountName: username,
-        password: password
-    });
 
     let responded = false;
     const sendResponse = (payload) => {
@@ -416,6 +417,23 @@ app.post('/api/account/login', (req, res) => {
         res.json(payload);
     };
 
+    client.once('loggedOn', () => {
+        sendResponse({ success: true, username: acc.username });
+    });
+
+    client.once('steamGuard', (domain) => {
+        sendResponse({ success: false, steamGuard: true, type: domain ? 'email' : 'app', username: acc.username });
+    });
+
+    client.once('error', (err) => {
+        sendResponse({ success: false, error: getSteamErrorMessage(err) });
+    });
+
+    client.logOn({
+        accountName: username,
+        password: password
+    });
+
     const timeout = setTimeout(() => {
         if (acc.steamGuardNeeded) {
             sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
@@ -424,9 +442,9 @@ app.post('/api/account/login', (req, res) => {
         } else if (acc.loggedIn) {
             sendResponse({ success: true, username: acc.username });
         } else {
-            sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı' });
+            sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı. Şifrenizi kontrol edip tekrar deneyin.' });
         }
-    }, 10000);
+    }, 8000);
 
     const checkInterval = setInterval(() => {
         if (acc.loggedIn || acc.error || acc.steamGuardNeeded) {
@@ -438,7 +456,7 @@ app.post('/api/account/login', (req, res) => {
                 sendResponse({ success: true, username: acc.username });
             }
         }
-    }, 500);
+    }, 300);
 });
 
 app.post('/api/account/qr-start', async (req, res) => {
