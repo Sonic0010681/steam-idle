@@ -214,6 +214,13 @@ function createSteamClientForAccount(acc) {
         try {
             client.setPersona(acc.personaState || SteamUser.EPersonaState.Online);
         } catch (e) {}
+
+        if (acc.games && acc.games.length > 0) {
+            try {
+                client.gamesPlayed(acc.games);
+                console.log(`🎮 [${acc.username}] ${acc.games.length} oyun için otomatik idle başlatıldı: ${acc.games.join(', ')}`);
+            } catch (e) {}
+        }
     });
 
     client.on('accountInfo', (name) => {
@@ -592,25 +599,28 @@ app.post('/api/account/steamguard', async (req, res) => {
         return res.json({ success: false, error: 'Hesap bulunamadı' });
     }
 
+    const cleanCode = String(code).trim().toUpperCase();
+
+    // 1. Try steam-session submitSteamGuardCode
     if (acc.loginSession) {
         try {
-            await acc.loginSession.submitSteamGuardCode(code);
+            await acc.loginSession.submitSteamGuardCode(cleanCode);
             if (acc.loginSession.refreshToken) {
                 acc.steamGuardNeeded = false;
                 const client = createSteamClientForAccount(acc);
                 client.logOn({ refreshToken: acc.loginSession.refreshToken });
-                acc.loggedIn = true;
                 return res.json({ success: true, username: acc.username });
             }
         } catch (err) {
             console.error(`❌ [${username}] steam-session guard code error:`, err.message);
-            return res.json({ success: false, error: getSteamErrorMessage(err) });
+            // Fallback to direct client logon if session timed out or was canceled
         }
     }
 
+    // 2. Try legacy pendingSteamGuardCallback
     if (acc.pendingSteamGuardCallback) {
         acc.steamGuardNeeded = false;
-        acc.pendingSteamGuardCallback(code);
+        acc.pendingSteamGuardCallback(cleanCode);
         acc.pendingSteamGuardCallback = null;
 
         let responded = false;
@@ -642,7 +652,50 @@ app.post('/api/account/steamguard', async (req, res) => {
         return;
     }
 
-    res.json({ success: false, error: 'Geçersiz veya zamanı dolmuş Steam Guard isteği' });
+    // 3. Fallback direct client logOn with authCode & twoFactorCode
+    const client = createSteamClientForAccount(acc);
+    acc.steamGuardNeeded = false;
+
+    let responded = false;
+    const sendResponse = (payload) => {
+        if (responded || res.headersSent) return;
+        responded = true;
+        clearTimeout(timeout);
+        clearInterval(checkInterval);
+        res.json(payload);
+    };
+
+    client.once('loggedOn', () => {
+        sendResponse({ success: true, username: acc.username });
+    });
+
+    client.once('error', (err) => {
+        sendResponse({ success: false, error: getSteamErrorMessage(err) });
+    });
+
+    client.logOn({
+        accountName: acc.username,
+        authCode: cleanCode,
+        twoFactorCode: cleanCode
+    });
+
+    const timeout = setTimeout(() => {
+        if (acc.loggedIn) {
+            sendResponse({ success: true, username: acc.username });
+        } else {
+            sendResponse({ success: false, error: acc.error || 'Steam Guard kodunun süresi dolmuş olabilir. Lütfen şifrenizle tekrar giriş deneyin.' });
+        }
+    }, 8000);
+
+    const checkInterval = setInterval(() => {
+        if (acc.loggedIn || acc.error) {
+            if (acc.loggedIn) {
+                sendResponse({ success: true, username: acc.username });
+            } else {
+                sendResponse({ success: false, error: acc.error });
+            }
+        }
+    }, 300);
 });
 
 app.post('/api/account/nickname', (req, res) => {
@@ -743,8 +796,8 @@ app.post('/api/account/idle', (req, res) => {
     const key = getAccountKey(sessionId, username);
     const acc = accounts.get(key);
 
-    if (!acc || !acc.loggedIn || !acc.client) {
-        return res.json({ success: false, error: 'Hesap çevrimiçi değil, önce giriş yapın' });
+    if (!acc) {
+        return res.json({ success: false, error: 'Hesap bulunamadı, önce giriş yapın' });
     }
 
     if (!appIds || !Array.isArray(appIds) || appIds.length === 0) {
@@ -752,15 +805,21 @@ app.post('/api/account/idle', (req, res) => {
     }
 
     const ids = appIds.slice(0, 32).map(id => Math.abs(parseInt(id) || 730));
+    acc.games = ids;
+    acc.startTime = Date.now();
 
-    try {
-        acc.client.gamesPlayed(ids);
-        acc.games = ids;
-        acc.startTime = Date.now();
-        res.json({ success: true, games: ids });
-    } catch (err) {
-        res.json({ success: false, error: err.message });
+    if (acc.client && acc.loggedIn) {
+        try {
+            acc.client.gamesPlayed(ids);
+            console.log(`🎮 [${username}] ${ids.length} oyun için idle başlatıldı: ${ids.join(', ')}`);
+        } catch (err) {
+            console.error(`[${username}] gamesPlayed hatası:`, err.message);
+        }
+    } else {
+        console.log(`⏳ [${username}] Steam bağlantısı bekleniyor, bağlandığında idle otomatik başlayacak: ${ids.join(', ')}`);
     }
+
+    res.json({ success: true, games: ids });
 });
 
 app.post('/api/account/stop', (req, res) => {
