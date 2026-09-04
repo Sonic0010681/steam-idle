@@ -483,13 +483,6 @@
             <div class="accounts-list" id="sidebarAccountsList">
                 <!-- Hesap kartları -->
             </div>
-
-            <button class="btn-add-full" onclick="showAddAccountView()">
-                <span>+</span> ŞİFRE İLE HESAP EKLE
-            </button>
-            <button class="btn-add-full" style="background: rgba(139, 92, 246, 0.12); border-color: var(--neon-secondary); color: var(--neon-secondary);" onclick="showQrAddAccountView()">
-                <span>📱</span> QR KOD İLE HESAP EKLE
-            </button>
         </aside>
 
         <!-- MAIN CONTENT AREA -->
@@ -519,10 +512,10 @@
 
                     <!-- LOGIN TYPE TABS (Password vs QR Code) -->
                     <div class="login-tabs">
-                        <button class="login-tab-btn active" id="loginTabPass" onclick="switchLoginMode('password')">
+                        <button type="button" class="login-tab-btn active" id="loginTabPass" onclick="switchLoginMode('password')">
                             🔑 Şifre İle Giriş Yap
                         </button>
-                        <button class="login-tab-btn" id="loginTabQR" onclick="switchLoginMode('qr')">
+                        <button type="button" class="login-tab-btn" id="loginTabQR" onclick="switchLoginMode('qr')">
                             📱 QR KOD İLE GİRİŞ
                         </button>
                     </div>
@@ -555,11 +548,14 @@
                         <div class="qr-container">
                             <div class="qr-img-box" id="qrBox">
                                 <div class="qr-scan-line"></div>
-                                <span class="spinner" style="width: 32px; height: 32px;"></span>
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                                    <span class="spinner" style="width: 36px; height: 36px; border-width: 3px;"></span>
+                                    <span style="font-size: 0.8rem; color: var(--neon-primary); font-weight: 600;">Steam QR Kodu Oluşturuluyor...</span>
+                                </div>
                             </div>
 
                             <div class="qr-instructions">
-                                <strong>📱 Steam Mobil Uygulaması İle Tara:</strong>
+                                <strong style="color: var(--neon-primary); font-size: 0.95rem;">📱 Steam Mobil Uygulaması İle Tara:</strong>
                                 <ol>
                                     <li>Telefonunuzdan <strong>Steam Mobil Uygulamasını</strong> açın.</li>
                                     <li>Alt kısımdaki <strong>Steam Guard (Kalkan)</strong> simgesine dokunun.</li>
@@ -738,11 +734,14 @@
         let qrCountdownSec = 60;
         let currentQrSessionId = null;
 
+        const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5000' : '';
+
         async function apiFetch(url, options = {}) {
             options.headers = options.headers || {};
             options.headers['x-session-id'] = sessionId;
             options.headers['Content-Type'] = 'application/json';
-            const res = await fetch(url, options);
+            const targetUrl = url.startsWith('http') ? url : (API_BASE + url);
+            const res = await fetch(targetUrl, options);
             return await res.json();
         }
 
