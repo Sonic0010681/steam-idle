@@ -1018,10 +1018,12 @@
                     activeAccountData = data;
                     if (data.steamGuardNeeded) {
                         showView('steamGuardView');
-                        document.getElementById('steamGuardPrompt').textContent =
-                            data.steamGuardType === 'email'
-                                ? `[${username}] E-postanıza gelen 5 haneli Steam Guard kodunu girin.`
-                                : `[${username}] Steam mobil uygulamanızdaki 5 haneli kodu girin.`;
+                        const promptEl = document.getElementById('steamGuardPrompt');
+                        if (data.steamGuardType === 'email') {
+                            promptEl.innerHTML = `📧 <strong>[${username}]</strong> Hesabında E-Posta Kalkanı aktif! E-postana gönderilen 5 haneli Steam Guard kodunu girin.`;
+                        } else {
+                            promptEl.innerHTML = `📱 <strong>[${username}]</strong> Hesabında <u>Steam Mobil Kalkanı (Authenticator)</u> aktif!<br><span style="color: var(--gold); font-weight: 700;">⚠️ E-postaya kod gelmez!</span> Telefonundaki <strong>Steam Uygulamasını</strong> açıp <strong>Steam Guard (Kalkan 🛡️)</strong> sekmesindeki 5 haneli kodu girin.`;
+                        }
                     } else if (data.loggedIn) {
                         showView('accountDashboardView');
                         updateDashboardUI();
@@ -1230,11 +1232,12 @@
                 } else if (data.steamGuard) {
                     activeUsername = username;
                     showView('steamGuardView');
-                    const domainStr = data.domain ? ` (${data.domain})` : '';
-                    document.getElementById('steamGuardPrompt').textContent =
-                        data.type === 'email'
-                            ? `[${username}] E-postanıza${domainStr} gönderilen 5 haneli Steam Guard kodunu girin.`
-                            : `[${username}] Steam mobil uygulamanızdaki 5 haneli Guard kodunu girin.`;
+                    const promptEl = document.getElementById('steamGuardPrompt');
+                    if (data.type === 'email' && data.domain) {
+                        promptEl.innerHTML = `📧 <strong>[${username}]</strong> Hesabında E-Posta Kalkanı aktif! E-postana (<strong>${data.domain}</strong>) gönderilen 5 haneli Steam Guard kodunu girin.`;
+                    } else {
+                        promptEl.innerHTML = `📱 <strong>[${username}]</strong> Hesabında <u>Steam Mobil Kalkanı (Authenticator)</u> aktif!<br><span style="color: var(--gold); font-weight: 700;">⚠️ E-postaya kod gelmez!</span> Telefonundaki <strong>Steam Uygulamasını</strong> açıp <strong>Steam Guard (Kalkan 🛡️)</strong> sekmesindeki 5 haneli kodu girin.`;
+                    }
                 } else {
                     errDiv.innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
                 }
