@@ -390,8 +390,8 @@ app.get('/api/account/status', (req, res) => {
 });
 
 app.post('/api/account/login', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
-    const { username, password } = req.body;
+    const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
+    const { username, password } = req.body || {};
 
     if (!sessionId || !username || !password) {
         return res.json({ success: false, error: 'Kullanıcı adı ve şifre gerekli' });
@@ -442,7 +442,7 @@ app.post('/api/account/login', (req, res) => {
 });
 
 app.post('/api/account/qr-start', async (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
+    const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
     if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
 
     try {
@@ -522,8 +522,8 @@ app.get('/api/account/qr-status', (req, res) => {
 });
 
 app.post('/api/account/steamguard', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
-    const { username, code } = req.body;
+    const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
+    const { username, code } = req.body || {};
 
     if (!sessionId || !username || !code) {
         return res.json({ success: false, error: 'Eksik bilgi' });

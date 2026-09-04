@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steam Idle Pro Master - Saati Kas & QR Giriş!</title>
+    <title>Steam Idle - Oyun Saati Kasma</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -456,12 +456,12 @@
                 <div class="brand-icon">🎮</div>
                 <div class="brand-text">
                     <h1>STEAM IDLE</h1>
-                    <p>Master Pro & QR Giriş</p>
+                    <p>Oyun Saati Kasma</p>
                 </div>
             </div>
 
-            <!-- MASTER CONTROL BOX -->
-            <div class="master-box">
+            <!-- MASTER CONTROL BOX (Sadece Hesap Eklenince Görünür) -->
+            <div class="master-box" id="masterBox" style="display: none;">
                 <div class="master-title">
                     <span>⚡ TOPLU KONTROL (MASTER)</span>
                 </div>
@@ -488,7 +488,7 @@
                 <span>+</span> ŞİFRE İLE HESAP EKLE
             </button>
             <button class="btn-add-full" style="background: rgba(139, 92, 246, 0.12); border-color: var(--neon-secondary); color: var(--neon-secondary);" onclick="showQrAddAccountView()">
-                <span>📱</span> MOBİL QR İLE HESAP EKLE
+                <span>📱</span> QR KOD İLE HESAP EKLE
             </button>
         </aside>
 
@@ -523,7 +523,7 @@
                             🔑 Şifre İle Giriş Yap
                         </button>
                         <button class="login-tab-btn" id="loginTabQR" onclick="switchLoginMode('qr')">
-                            📱 Steam Mobil QR Kodu İle Giriş Yap
+                            📱 QR KOD İLE GİRİŞ
                         </button>
                     </div>
 
@@ -766,20 +766,28 @@
         // ============================================================
         // LOGIN MODE SWITCHER & 60s QR AUTO REFRESH
         // ============================================================
+        let currentLoginMode = 'password';
+
         function switchLoginMode(mode) {
+            currentLoginMode = mode;
             if (qrPollingInterval) clearInterval(qrPollingInterval);
             if (qrCountdownInterval) clearInterval(qrCountdownInterval);
 
+            const passBtn = document.getElementById('loginTabPass');
+            const qrBtn = document.getElementById('loginTabQR');
+            const passMode = document.getElementById('loginPassMode');
+            const qrMode = document.getElementById('loginQRMode');
+
             if (mode === 'password') {
-                document.getElementById('loginTabPass').className = 'login-tab-btn active';
-                document.getElementById('loginTabQR').className = 'login-tab-btn';
-                document.getElementById('loginPassMode').style.display = 'block';
-                document.getElementById('loginQRMode').style.display = 'none';
+                if (passBtn) passBtn.className = 'login-tab-btn active';
+                if (qrBtn) qrBtn.className = 'login-tab-btn';
+                if (passMode) passMode.style.display = 'block';
+                if (qrMode) qrMode.style.display = 'none';
             } else {
-                document.getElementById('loginTabPass').className = 'login-tab-btn';
-                document.getElementById('loginTabQR').className = 'login-tab-btn active';
-                document.getElementById('loginPassMode').style.display = 'none';
-                document.getElementById('loginQRMode').style.display = 'block';
+                if (passBtn) passBtn.className = 'login-tab-btn';
+                if (qrBtn) qrBtn.className = 'login-tab-btn active';
+                if (passMode) passMode.style.display = 'none';
+                if (qrMode) qrMode.style.display = 'block';
                 startQrLoginFlow();
             }
         }
@@ -790,26 +798,43 @@
 
             const qrBox = document.getElementById('qrBox');
             const qrTimerVal = document.getElementById('qrTimerVal');
-            
-            qrBox.innerHTML = '<div class="qr-scan-line"></div><span class="spinner" style="width: 32px; height: 32px;"></span>';
+            const qrStatusMsg = document.getElementById('qrStatusMsg');
+
+            if (qrBox) {
+                qrBox.innerHTML = '<div class="qr-scan-line"></div><span class="spinner" style="width: 32px; height: 32px;"></span>';
+            }
             if (qrTimerVal) qrTimerVal.textContent = '60s';
+            if (qrStatusMsg) {
+                qrStatusMsg.innerHTML = `
+                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--neon-primary);">
+                        📱 Steam Mobil Uygulamasından QR Kodunu Okutun!
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
+                        ⏱️ QR Kod Yenileniyor: <strong style="color: var(--gold);" id="qrTimerVal">60s</strong>
+                    </div>
+                `;
+            }
 
             try {
                 const data = await apiFetch('/api/account/qr-start', { method: 'POST' });
                 if (data.success) {
                     currentQrSessionId = data.qrSessionId;
-                    qrBox.innerHTML = `
-                        <div class="qr-scan-line"></div>
-                        <img src="${data.qrDataUrl}" alt="Steam QR Login">
-                    `;
+                    if (qrBox) {
+                        qrBox.innerHTML = `
+                            <div class="qr-scan-line"></div>
+                            <img src="${data.qrDataUrl}" alt="Steam QR Login">
+                        `;
+                    }
 
                     // 60 Saniye Canlı Geri Sayım & Otomatik Yenileme
                     qrCountdownSec = 60;
-                    if (qrTimerVal) qrTimerVal.textContent = `${qrCountdownSec}s`;
+                    const timerElem = document.getElementById('qrTimerVal');
+                    if (timerElem) timerElem.textContent = `${qrCountdownSec}s`;
 
                     qrCountdownInterval = setInterval(() => {
                         qrCountdownSec--;
-                        if (qrTimerVal) qrTimerVal.textContent = `${qrCountdownSec}s`;
+                        const curTimerElem = document.getElementById('qrTimerVal');
+                        if (curTimerElem) curTimerElem.textContent = `${qrCountdownSec}s`;
 
                         if (qrCountdownSec <= 0) {
                             clearInterval(qrCountdownInterval);
@@ -825,32 +850,42 @@
                             if (res.authenticated) {
                                 clearInterval(qrPollingInterval);
                                 clearInterval(qrCountdownInterval);
-                                document.getElementById('qrStatusMsg').innerHTML = `
-                                    <div style="font-size: 1rem; font-weight: 800; color: var(--green);">
-                                        ✅ QR KOD BAŞARIYLA TARANDI! GİRİŞ YAPILIYOR...
-                                    </div>
-                                `;
+                                const statusElem = document.getElementById('qrStatusMsg');
+                                if (statusElem) {
+                                    statusElem.innerHTML = `
+                                        <div style="font-size: 1rem; font-weight: 800; color: var(--green);">
+                                            ✅ QR KOD BAŞARIYLA TARANDI! GİRİŞ YAPILIYOR...
+                                        </div>
+                                    `;
+                                }
                                 activeUsername = res.username;
                                 setTimeout(() => { loadAccounts(); }, 800);
                             } else if (res.error) {
                                 clearInterval(qrPollingInterval);
                                 clearInterval(qrCountdownInterval);
-                                document.getElementById('qrStatusMsg').innerHTML = `
-                                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--red);">
-                                        ❌ ${res.error}
-                                    </div>
-                                    <button onclick="startQrLoginFlow()" class="btn-master btn-master-start" style="margin: 10px auto; width: auto; padding: 6px 16px;">
-                                        🔄 Yeniden QR Kod Oluştur
-                                    </button>
-                                `;
+                                const statusElem = document.getElementById('qrStatusMsg');
+                                if (statusElem) {
+                                    statusElem.innerHTML = `
+                                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--red);">
+                                            ❌ ${res.error}
+                                        </div>
+                                        <button onclick="startQrLoginFlow()" class="btn-master btn-master-start" style="margin: 10px auto; width: auto; padding: 6px 16px;">
+                                            🔄 Yeniden QR Kod Oluştur
+                                        </button>
+                                    `;
+                                }
                             }
                         } catch (e) {}
                     }, 1500);
                 } else {
-                    document.getElementById('qrStatusMsg').innerHTML = `<div style="color: var(--red);">❌ QR Kod oluşturulamadı: ${data.error}</div>`;
+                    if (qrStatusMsg) {
+                        qrStatusMsg.innerHTML = `<div style="color: var(--red);">❌ QR Kod oluşturulamadı: ${data.error}</div>`;
+                    }
                 }
             } catch (e) {
-                document.getElementById('qrStatusMsg').innerHTML = '<div style="color: var(--red);">❌ Sunucu bağlantı hatası.</div>';
+                if (qrStatusMsg) {
+                    qrStatusMsg.innerHTML = '<div style="color: var(--red);">❌ Sunucu bağlantı hatası.</div>';
+                }
             }
         }
 
@@ -862,12 +897,17 @@
             document.getElementById(viewId).classList.add('active');
         }
 
-        function showAddAccountView() {
+        function showAddAccountView(preserveMode = false) {
             activeUsername = null;
             renderSidebar();
             showView('addAccountView');
-            switchLoginMode('password');
-            document.getElementById('loginErrorMsg').innerHTML = '';
+            if (preserveMode) {
+                switchLoginMode(currentLoginMode);
+            } else {
+                switchLoginMode('password');
+            }
+            const errDiv = document.getElementById('loginErrorMsg');
+            if (errDiv) errDiv.innerHTML = '';
         }
 
         function showQrAddAccountView() {
@@ -875,7 +915,8 @@
             renderSidebar();
             showView('addAccountView');
             switchLoginMode('qr');
-            document.getElementById('loginErrorMsg').innerHTML = '';
+            const errDiv = document.getElementById('loginErrorMsg');
+            if (errDiv) errDiv.innerHTML = '';
         }
 
         // ============================================================
@@ -896,7 +937,8 @@
                             selectAccount(activeUsername);
                         }
                     } else {
-                        showAddAccountView();
+                        const isAddViewActive = document.getElementById('addAccountView').classList.contains('active');
+                        showAddAccountView(isAddViewActive);
                     }
                 }
             } catch (e) {
@@ -905,6 +947,11 @@
         }
 
         function renderSidebar() {
+            const masterBox = document.getElementById('masterBox');
+            if (masterBox) {
+                masterBox.style.display = accountsList.length > 0 ? 'block' : 'none';
+            }
+
             const container = document.getElementById('sidebarAccountsList');
             container.innerHTML = '';
 
