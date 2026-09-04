@@ -2,13 +2,96 @@ const express = require('express');
 const SteamUser = require('steam-user');
 const { LoginSession, EAuthTokenPlatformType } = require('steam-session');
 const QRCode = require('qrcode');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const app = express();
-app.use(express.json());
+
+// ============================================================
+// GÜVENLİK ÖNLEMLERİ (SECURITY & HARDENING)
+// ============================================================
+
+// 1. Sunucu Bilgisini Gizle (Anti-Fingerprinting)
+app.disable('x-powered-by');
+
+// 2. HTTP Güvenlik Başlıkları (Helmet CSP, XSS, Clickjacking, Anti-Sniffing)
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://fonts.googleapis.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "https://*.steamstatic.com", "https://*.steampowered.com"],
+            connectSrc: ["'self'"]
+        }
+    },
+    crossOriginEmbedderPolicy: false,
+    frameguard: { action: 'deny' }, // Anti-Clickjacking
+    noSniff: true,                   // Anti-MIME Sniffing
+    xssFilter: true                  // Anti-XSS Injection
+}));
+
+app.use(express.json({ limit: '10kb' })); // Anti-Payload Bomb (Maksimum 10KB JSON isteği)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Popüler Oyunlar Kataloğu (Fallback / Ek Listeleme İçin)
+// 3. Rate Limiting (DDoS & Brute Force Saldırı Koruması)
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 dakika
+    max: 200,                  // IP başına maks 200 istek
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: 'Çok fazla istek yapıldı, lütfen biraz bekleyin (DDoS Koruması).' }
+});
+app.use('/api/', globalLimiter);
+
+// Sıkı Giriş Sınırlaması (Brute-Force / Şifre Deneme Koruması)
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 dakika
+    max: 12,                  // IP başına 15 dakikada maks 12 giriş denemesi
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: 'Çok fazla hatalı giriş denemesi yapıldı. Güvenlik nedeniyle 15 dakika bekleyin.' }
+});
+app.use('/api/account/login', loginLimiter);
+app.use('/api/account/steamguard', loginLimiter);
+app.use('/api/account/qr-start', loginLimiter);
+
+// 4. Input Sanitization & Anti-Injection Middleware (XSS, SQLi, Prototype Pollution Koruması)
+function sanitizeInput(input) {
+    if (typeof input === 'string') {
+        // HTML/Script/SQL karakterlerini temizle ve zararlı kodları etkisizleştir
+        return input
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/'/g, '&#39;')
+            .replace(/"/g, '&quot;')
+            .replace(/`/g, '&#96;')
+            .replace(/;/g, '')
+            .trim();
+    }
+    return input;
+}
+
+app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+        // Prototype Pollution Koruması (__proto__, constructor engelleme)
+        if (req.body.__proto__ || req.body.constructor?.prototype) {
+            return res.status(400).json({ success: false, error: 'Geçersiz veri yapısı' });
+        }
+        for (const key in req.body) {
+            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+                req.body[key] = sanitizeInput(req.body[key]);
+            }
+        }
+    }
+    next();
+});
+
+// ============================================================
+// STEAM IDLE VERİ YAPILARI
+// ============================================================
 const POPULAR_GAMES = [
     { appId: 730, name: 'Counter-Strike 2' },
     { appId: 570, name: 'Dota 2' },
@@ -38,15 +121,14 @@ const POPULAR_GAMES = [
     { appId: 739630, name: 'Phasmophobia' },
 ];
 
-// Multi-tenant & Çoklu Hesap Veri Yapıları
-// accounts: accountKey -> Account Object
-// sessionAccounts: sessionId -> Set of accountKeys
 const accounts = new Map();
 const sessionAccounts = new Map();
 const pendingQrSessions = new Map();
 
 function getAccountKey(sessionId, username) {
-    return `${sessionId}:${username.toLowerCase()}`;
+    const cleanSession = String(sessionId).replace(/[^a-zA-Z0-9_-]/g, '');
+    const cleanUser = String(username).toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '');
+    return `${cleanSession}:${cleanUser}`;
 }
 
 function getOrCreateAccount(sessionId, username) {
@@ -58,8 +140,8 @@ function getOrCreateAccount(sessionId, username) {
     const acc = {
         key,
         sessionId,
-        username,
-        nickname: null,            // Özel takma ad (örn: "Ana Hesabım")
+        username: String(username).trim(),
+        nickname: null,
         persona: null,
         steamID: null,
         loggedIn: false,
@@ -67,14 +149,14 @@ function getOrCreateAccount(sessionId, username) {
         steamGuardType: null,
         pendingSteamGuardCallback: null,
         error: null,
-        personaState: SteamUser.EPersonaState.Online, // 1: Online, 7: Invisible, 3: Away, 4: Busy
-        games: [],                 // Kasılan appId'ler
-        ownedGames: [],            // Sahip olunan oyunlar
+        personaState: SteamUser.EPersonaState.Online,
+        games: [],
+        ownedGames: [],
         startTime: null,
-        totalIdleSeconds: 0,       // Toplam idle süresi (saniye)
-        dailySeconds: 0,           // Günlük idle süresi (saniye)
-        weeklySeconds: 0,          // Haftalık idle süresi (saniye)
-        monthlySeconds: 0,         // Aylık idle süresi (saniye)
+        totalIdleSeconds: 0,
+        dailySeconds: 0,
+        weeklySeconds: 0,
+        monthlySeconds: 0,
         client: null
     };
 
@@ -88,14 +170,23 @@ function getOrCreateAccount(sessionId, username) {
     return acc;
 }
 
-// 1 Saniyelik ZAMAN SÜRESİ İLERLETME SAYAÇI (Analiz & Saat Takibi)
+// 5. Bellek Şişmesi & Çöp Temizleyici (Garbage Collection & DoS Protection)
 setInterval(() => {
+    // Saniye sayacı
     for (const acc of accounts.values()) {
         if (acc.loggedIn && acc.games && acc.games.length > 0) {
             acc.totalIdleSeconds = (acc.totalIdleSeconds || 0) + 1;
             acc.dailySeconds = (acc.dailySeconds || 0) + 1;
             acc.weeklySeconds = (acc.weeklySeconds || 0) + 1;
             acc.monthlySeconds = (acc.monthlySeconds || 0) + 1;
+        }
+    }
+
+    // Zaman aşımına uğramış QR oturumlarını bellekten temizle
+    const now = Date.now();
+    for (const [qrId, state] of pendingQrSessions.entries()) {
+        if (state.createdAt && (now - state.createdAt > 180000)) { // 3 dakika
+            pendingQrSessions.delete(qrId);
         }
     }
 }, 1000);
@@ -113,8 +204,7 @@ function createSteamClientForAccount(acc) {
 
     acc.client = client;
 
-    // Başarılı giriş
-    client.on('loggedOn', (details) => {
+    client.on('loggedOn', () => {
         console.log(`✅ [${acc.username}] Steam girişi başarılı! SteamID: ${client.steamID}`);
         acc.loggedIn = true;
         acc.steamGuardNeeded = false;
@@ -127,12 +217,10 @@ function createSteamClientForAccount(acc) {
         } catch (e) {}
     });
 
-    // Kullanıcı takma adı
     client.on('accountInfo', (name) => {
-        acc.persona = name;
+        acc.persona = sanitizeInput(name);
     });
 
-    // Steam Guard gerekli
     client.on('steamGuard', (domain, callback) => {
         console.log(`🔐 [${acc.username}] Steam Guard kodu bekleniyor (${domain ? 'e-posta: ' + domain : 'mobil uygulama'})`);
         acc.steamGuardNeeded = true;
@@ -140,7 +228,6 @@ function createSteamClientForAccount(acc) {
         acc.pendingSteamGuardCallback = callback;
     });
 
-    // Sahip olunan oyun lisansları ve PICS önbelleği yüklendiğinde
     client.on('ownershipCached', () => {
         try {
             const ownedAppIds = client.getOwnedApps() || [];
@@ -155,7 +242,7 @@ function createSteamClientForAccount(acc) {
                 if (!name && client.picsCache && client.picsCache.apps && client.picsCache.apps[idNum]) {
                     const appInfo = client.picsCache.apps[idNum].appinfo;
                     if (appInfo && appInfo.common && appInfo.common.name) {
-                        name = appInfo.common.name;
+                        name = sanitizeInput(appInfo.common.name);
                     }
                 }
 
@@ -171,7 +258,6 @@ function createSteamClientForAccount(acc) {
         }
     });
 
-    // Hata oluştu
     client.on('error', (err) => {
         console.error(`❌ [${acc.username}] Steam hatası:`, err.message);
         acc.loggedIn = false;
@@ -179,7 +265,6 @@ function createSteamClientForAccount(acc) {
         acc.error = getSteamErrorMessage(err);
     });
 
-    // Bağlantı kesildi
     client.on('disconnected', (eresult, msg) => {
         console.log(`🔌 [${acc.username}] Steam bağlantısı kesildi:`, msg);
         acc.loggedIn = false;
@@ -230,7 +315,6 @@ function getLeaderboardForSession(sessionId) {
 // API ROUTES
 // ============================================================
 
-// Oturuma ait tüm hesapların durum listesini ve liderlik sıralamasını getir
 app.get('/api/session/accounts', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.query.sid;
     if (!sessionId) return res.json({ success: true, accounts: [], leaderboard: [] });
@@ -269,7 +353,6 @@ app.get('/api/session/accounts', (req, res) => {
     res.json({ success: true, accounts: result, leaderboard });
 });
 
-// Belirli bir hesabın detaylı durumunu getir
 app.get('/api/account/status', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.query.sid;
     const username = req.query.username;
@@ -306,7 +389,6 @@ app.get('/api/account/status', (req, res) => {
     });
 });
 
-// Giriş Yap (Kullanıcı Adı & Şifre)
 app.post('/api/account/login', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username, password } = req.body;
@@ -359,7 +441,6 @@ app.post('/api/account/login', (req, res) => {
     }, 500);
 });
 
-// FEATURE: QR KOD İLE STEAM MOBİL GİRİŞİ BAŞLAT
 app.post('/api/account/qr-start', async (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
@@ -377,7 +458,8 @@ app.post('/api/account/qr-start', async (req, res) => {
             loginSession,
             authenticated: false,
             username: null,
-            error: null
+            error: null,
+            createdAt: Date.now()
         };
 
         pendingQrSessions.set(qrSessionId, sessionState);
@@ -421,7 +503,6 @@ app.post('/api/account/qr-start', async (req, res) => {
     }
 });
 
-// FEATURE: QR GİRİŞ DURUMUNU SORGULA
 app.get('/api/account/qr-status', (req, res) => {
     const { qrSessionId } = req.query;
     if (!qrSessionId || !pendingQrSessions.has(qrSessionId)) {
@@ -440,7 +521,6 @@ app.get('/api/account/qr-status', (req, res) => {
     res.json({ success: true, authenticated: false });
 });
 
-// Steam Guard Doğrula
 app.post('/api/account/steamguard', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username, code } = req.body;
@@ -488,7 +568,6 @@ app.post('/api/account/steamguard', (req, res) => {
     }, 500);
 });
 
-// Özel Takma Ad (Nickname) Belirle
 app.post('/api/account/nickname', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username, nickname } = req.body;
@@ -500,13 +579,12 @@ app.post('/api/account/nickname', (req, res) => {
     const key = getAccountKey(sessionId, username);
     const acc = accounts.get(key);
     if (acc) {
-        acc.nickname = nickname ? nickname.trim() : null;
+        acc.nickname = nickname ? sanitizeInput(nickname).substring(0, 30) : null;
         return res.json({ success: true, nickname: acc.nickname });
     }
     res.json({ success: false, error: 'Hesap bulunamadı' });
 });
 
-// Steam Durum Modu Değiştir (Çevrimiçi / Görünmez (Invisible) / Dışarıda / Meşgul)
 app.post('/api/account/personastate', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username, personaState } = req.body;
@@ -518,10 +596,10 @@ app.post('/api/account/personastate', (req, res) => {
     const key = getAccountKey(sessionId, username);
     const acc = accounts.get(key);
     if (acc && acc.client && acc.loggedIn) {
-        acc.personaState = Number(personaState);
+        const pState = Math.min(Math.max(Number(personaState) || 1, 0), 7);
+        acc.personaState = pState;
         try {
-            acc.client.setPersona(acc.personaState);
-            console.log(`🥷 [${acc.username}] Steam Durumu güncellendi: ${acc.personaState}`);
+            acc.client.setPersona(pState);
             return res.json({ success: true, personaState: acc.personaState });
         } catch (e) {
             return res.json({ success: false, error: e.message });
@@ -530,7 +608,6 @@ app.post('/api/account/personastate', (req, res) => {
     res.json({ success: false, error: 'Hesap çevrimiçi değil' });
 });
 
-// MASTER CONTROL 1: TEK TIKLA TÜM HESAPLARDA IDLE BAŞLAT
 app.post('/api/session/idle-all', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { appIds } = req.body;
@@ -538,7 +615,9 @@ app.post('/api/session/idle-all', (req, res) => {
     if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
 
     const keys = sessionAccounts.get(sessionId) || new Set();
-    const ids = (appIds && Array.isArray(appIds) && appIds.length > 0) ? appIds.slice(0, 32).map(Number) : [730];
+    const ids = (appIds && Array.isArray(appIds) && appIds.length > 0)
+        ? appIds.slice(0, 32).map(id => Math.abs(parseInt(id) || 730))
+        : [730];
 
     let startedCount = 0;
     for (const key of keys) {
@@ -553,11 +632,9 @@ app.post('/api/session/idle-all', (req, res) => {
         }
     }
 
-    console.log(`🚀 [Master Control] ${startedCount} adet hesapta toplu idle başlatıldı: ${ids.join(', ')}`);
     res.json({ success: true, count: startedCount, games: ids });
 });
 
-// MASTER CONTROL 2: TEK TIKLA TÜM HESAPLARDA IDLE DURDUR
 app.post('/api/session/stop-all', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
@@ -575,11 +652,9 @@ app.post('/api/session/stop-all', (req, res) => {
         }
     }
 
-    console.log(`⏹ [Master Control] ${stoppedCount} adet hesapta idle durduruldu.`);
     res.json({ success: true, count: stoppedCount });
 });
 
-// Idle Başlat (Tekil)
 app.post('/api/account/idle', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username, appIds } = req.body;
@@ -599,20 +674,18 @@ app.post('/api/account/idle', (req, res) => {
         return res.json({ success: false, error: 'En az bir oyun seçin' });
     }
 
-    const ids = appIds.slice(0, 32).map(Number);
+    const ids = appIds.slice(0, 32).map(id => Math.abs(parseInt(id) || 730));
 
     try {
         acc.client.gamesPlayed(ids);
         acc.games = ids;
         acc.startTime = Date.now();
-        console.log(`🎮 [${acc.username}] Idle başlatıldı! Oyunlar: ${ids.join(', ')}`);
         res.json({ success: true, games: ids });
     } catch (err) {
         res.json({ success: false, error: err.message });
     }
 });
 
-// Idle Durdur (Tekil)
 app.post('/api/account/stop', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username } = req.body;
@@ -623,13 +696,11 @@ app.post('/api/account/stop', (req, res) => {
         if (acc && acc.client && acc.loggedIn) {
             acc.client.gamesPlayed([]);
             acc.games = [];
-            console.log(`⏹ [${acc.username}] Idle durduruldu.`);
         }
     }
     res.json({ success: true });
 });
 
-// Hesaptan Çıkış Yap / Kaldır
 app.post('/api/account/logout', (req, res) => {
     const sessionId = req.headers['x-session-id'] || req.body.sid;
     const { username } = req.body;
@@ -648,15 +719,24 @@ app.post('/api/account/logout', (req, res) => {
             if (sessionAccounts.has(sessionId)) {
                 sessionAccounts.get(sessionId).delete(key);
             }
-            console.log(`👋 [${username}] Hesaptan çıkış yapıldı ve listeden kaldırıldı.`);
         }
     }
     res.json({ success: true });
 });
 
-// Genel Popüler Oyunlar Kataloğu
 app.get('/api/games', (req, res) => {
     res.json(POPULAR_GAMES);
+});
+
+// 404 Handler
+app.use((req, res) => {
+    res.status(404).json({ success: false, error: 'Bulunamadı (404)' });
+});
+
+// Global Error Handler (Sistem Çökmesini Önleme)
+app.use((err, req, res, next) => {
+    console.error('⚠️ Sunucu içi işlenmemiş hata:', err.stack);
+    res.status(500).json({ success: false, error: 'Sunucu içi bir hata oluştu.' });
 });
 
 // ============================================================
@@ -666,15 +746,13 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════╗
-║ 🎮 STEAM IDLE PRO MASTER - SAAT KASICI & ANALİZ          ║
+║ 🛡️ STEAM IDLE PRO - ÜST DÜZEY GÜVENLİ SERVER HARDENED   ║
 ║ http://localhost:${PORT}                                   ║
 ║                                                          ║
-║ ⚡ 📲 STEAM MOBİL UYGULAMASIYLA QR KOD İLE GİRİŞ DESTEĞİ! ║
-║ ⚡ 1. Tek Tıkla Tüm Hesaplarda Saat Kasma (Master)       ║
-║ ⚡ 3. Görünmez (Invisible) & Gizli Modda Saat Kasma      ║
-║ ⚡ 🎨 RGB / Cyberpunk / Synthwave Temaları               ║
-║ ⚡ 📊 Günlük/Haftalık/Aylık/Yıllık Saat Analizi          ║
-║ ⚡ 🏆 Canlı Liderlik Tablosu (En çok saat kasan 1.)       ║
+║ 🛡️ Helmet CSP, XSS, Clickjacking, MIME Sniffing aktif    ║
+║ 🛡️ Rate Limiting (DDoS & Brute Force koruması) aktif     ║
+║ 🛡️ Input Sanitization & Anti-Injection koruması aktif     ║
+║ 🛡️ Anti-Payload Bomb & Memory Leak protection aktif       ║
 ╚══════════════════════════════════════════════════════════╝
     `);
 });
