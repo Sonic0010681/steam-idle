@@ -747,7 +747,8 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    await loadAccounts(username);
+                    saveClientAccountSession(data.username || username, data.refreshToken || 'active');
+                    await loadAccounts(data.username || username);
                 } else if (data.steamGuard) {
                     activeUsername = username;
                     const prompt = document.getElementById('guardPrompt');
@@ -791,10 +792,11 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    if (data.username && data.refreshToken) {
-                        saveClientAccountSession(data.username, data.refreshToken);
+                    const u = data.username || activeUsername;
+                    if (u) {
+                        saveClientAccountSession(u, data.refreshToken || 'active');
                     }
-                    await loadAccounts(activeUsername);
+                    await loadAccounts(u);
                 } else {
                     const msg = data.error || 'Steam Guard kodu geçersiz veya süresi dolmuş olabilir.';
                     errDiv.innerHTML = `<div class="error-box">❌ ${msg}</div>`;
@@ -823,7 +825,9 @@
         async function loadAccounts(selectUser = null) {
             try {
                 let saved = JSON.parse(localStorage.getItem('mySteamIdleAccounts') || '{}');
-                const usernames = Object.keys(saved);
+                const userSet = new Set(Object.keys(saved));
+                if (selectUser) userSet.add(String(selectUser).toLowerCase());
+                const usernames = Array.from(userSet);
 
                 const res = await fetch('/api/accounts', {
                     method: 'POST',
@@ -838,6 +842,8 @@
                 if (accountsList.length > 0) {
                     const target = selectUser || activeUsername || accountsList[0].username;
                     selectAccount(target);
+                } else if (selectUser) {
+                    selectAccount(selectUser);
                 } else {
                     showAddAccountScreen();
                 }
