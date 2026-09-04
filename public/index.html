@@ -512,39 +512,16 @@
 
                     <!-- LOGIN TYPE TABS (Password vs QR Code) -->
                     <div class="login-tabs">
-                        <button type="button" class="login-tab-btn active" id="loginTabPass" onclick="switchLoginMode('password')">
-                            🔑 Şifre İle Giriş Yap
-                        </button>
-                        <button type="button" class="login-tab-btn" id="loginTabQR" onclick="switchLoginMode('qr')">
+                        <button type="button" class="login-tab-btn active" id="loginTabQR" onclick="switchLoginMode('qr')">
                             📱 QR KOD İLE GİRİŞ
                         </button>
-                    </div>
-
-                    <!-- MODE 1: PASSWORD FORM -->
-                    <div id="loginPassMode">
-                        <div class="warn-msg">
-                            ⚡ Siteye giren herkes kendi hesabını ekleyebilir. Giriş bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
-                        </div>
-
-                        <div id="loginErrorMsg"></div>
-
-                        <div class="form-group">
-                            <label>Steam Kullanıcı Adı</label>
-                            <input type="text" id="loginUsername" placeholder="Steam kullanıcı adını gir..." autocomplete="off">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Şifre</label>
-                            <input type="password" id="loginPassword" placeholder="Şifreni gir...">
-                        </div>
-
-                        <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()">
-                            GİRİŞ YAP VE HESABI EKLE
+                        <button type="button" class="login-tab-btn" id="loginTabPass" onclick="switchLoginMode('password')">
+                            🔑 Şifre İle Manuel Giriş Yap
                         </button>
                     </div>
 
-                    <!-- MODE 2: QR CODE SCANNER FORM -->
-                    <div id="loginQRMode" style="display: none;">
+                    <!-- MODE 1: QR CODE SCANNER FORM (DEFAULT) -->
+                    <div id="loginQRMode" style="display: block;">
                         <div class="qr-container">
                             <div class="qr-img-box" id="qrBox">
                                 <div class="qr-scan-line"></div>
@@ -572,6 +549,29 @@
                                 ⏱️ QR Kod Yenileniyor: <strong style="color: var(--gold);" id="qrTimerVal">60s</strong>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- MODE 2: PASSWORD FORM -->
+                    <div id="loginPassMode" style="display: none;">
+                        <div class="warn-msg">
+                            ⚡ Siteye giren herkes kendi hesabını ekleyebilir. Giriş bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
+                        </div>
+
+                        <div id="loginErrorMsg"></div>
+
+                        <div class="form-group">
+                            <label>Steam Kullanıcı Adı</label>
+                            <input type="text" id="loginUsername" placeholder="Steam kullanıcı adını gir..." autocomplete="off">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Şifre</label>
+                            <input type="password" id="loginPassword" placeholder="Şifreni gir...">
+                        </div>
+
+                        <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()">
+                            GİRİŞ YAP VE HESABI EKLE
+                        </button>
                     </div>
                 </div>
             </div>
@@ -771,7 +771,7 @@
         // ============================================================
         // LOGIN MODE SWITCHER & 60s QR AUTO REFRESH
         // ============================================================
-        let currentLoginMode = 'password';
+        let currentLoginMode = 'qr';
 
         function switchLoginMode(mode) {
             currentLoginMode = mode;
@@ -911,7 +911,7 @@
             if (preserveMode) {
                 switchLoginMode(currentLoginMode);
             } else {
-                switchLoginMode('password');
+                switchLoginMode('qr');
             }
             const errDiv = document.getElementById('loginErrorMsg');
             if (errDiv) errDiv.innerHTML = '';
