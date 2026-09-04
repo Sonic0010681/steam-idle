@@ -394,7 +394,7 @@ app.get('/api/account/status', (req, res) => {
     });
 });
 
-app.post('/api/account/login', (req, res) => {
+app.post('/api/account/login', async (req, res) => {
     const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
     const { username, password } = req.body || {};
 
@@ -406,6 +406,48 @@ app.post('/api/account/login', (req, res) => {
     acc.error = null;
     acc.steamGuardNeeded = false;
 
+    // 1. Steam WebAPI Credentials Session (Steam-Session Modern Auth)
+    try {
+        const loginSession = new LoginSession(EAuthTokenPlatformType.SteamClient);
+        acc.loginSession = loginSession;
+
+        let startRes;
+        try {
+            startRes = await loginSession.startWithCredentials({
+                accountName: username,
+                password: password
+            });
+        } catch (err) {
+            console.error(`❌ [${username}] LoginSession error:`, err.message);
+            const errMsg = getSteamErrorMessage(err);
+            acc.error = errMsg;
+            return res.json({ success: false, error: errMsg });
+        }
+
+        if (startRes.actionRequired) {
+            acc.steamGuardNeeded = true;
+            const validActions = startRes.validActions || [];
+            const isEmail = validActions.some(a => a.type === 2 || a.type === 'email' || a.type === 'EmailCode');
+            acc.steamGuardType = isEmail ? 'email' : 'app';
+            return res.json({
+                success: false,
+                steamGuard: true,
+                type: acc.steamGuardType,
+                username: acc.username
+            });
+        }
+
+        if (loginSession.refreshToken) {
+            const client = createSteamClientForAccount(acc);
+            client.logOn({ refreshToken: loginSession.refreshToken });
+            acc.loggedIn = true;
+            return res.json({ success: true, username: acc.username });
+        }
+    } catch (e) {
+        console.error(`❌ [${username}] LoginSession exception:`, e);
+    }
+
+    // 2. Direct SteamUser Fallback
     const client = createSteamClientForAccount(acc);
 
     let responded = false;
@@ -539,7 +581,7 @@ app.get('/api/account/qr-status', (req, res) => {
     res.json({ success: true, authenticated: false });
 });
 
-app.post('/api/account/steamguard', (req, res) => {
+app.post('/api/account/steamguard', async (req, res) => {
     const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
     const { username, code } = req.body || {};
 
@@ -550,40 +592,61 @@ app.post('/api/account/steamguard', (req, res) => {
     const key = getAccountKey(sessionId, username);
     const acc = accounts.get(key);
 
-    if (!acc || !acc.pendingSteamGuardCallback) {
-        return res.json({ success: false, error: 'Geçersiz veya zamanı dolmuş Steam Guard isteği' });
+    if (!acc) {
+        return res.json({ success: false, error: 'Hesap bulunamadı' });
     }
 
-    acc.steamGuardNeeded = false;
-    acc.pendingSteamGuardCallback(code);
-    acc.pendingSteamGuardCallback = null;
-
-    let responded = false;
-    const sendResponse = (payload) => {
-        if (responded || res.headersSent) return;
-        responded = true;
-        clearTimeout(timeout);
-        clearInterval(checkInterval);
-        res.json(payload);
-    };
-
-    const timeout = setTimeout(() => {
-        if (acc.loggedIn) {
-            sendResponse({ success: true, username: acc.username });
-        } else {
-            sendResponse({ success: false, error: acc.error || 'Giriş başarısız' });
+    if (acc.loginSession) {
+        try {
+            await acc.loginSession.submitSteamGuardCode(code);
+            if (acc.loginSession.refreshToken) {
+                acc.steamGuardNeeded = false;
+                const client = createSteamClientForAccount(acc);
+                client.logOn({ refreshToken: acc.loginSession.refreshToken });
+                acc.loggedIn = true;
+                return res.json({ success: true, username: acc.username });
+            }
+        } catch (err) {
+            console.error(`❌ [${username}] steam-session guard code error:`, err.message);
+            return res.json({ success: false, error: getSteamErrorMessage(err) });
         }
-    }, 8000);
+    }
 
-    const checkInterval = setInterval(() => {
-        if (acc.loggedIn || acc.error) {
+    if (acc.pendingSteamGuardCallback) {
+        acc.steamGuardNeeded = false;
+        acc.pendingSteamGuardCallback(code);
+        acc.pendingSteamGuardCallback = null;
+
+        let responded = false;
+        const sendResponse = (payload) => {
+            if (responded || res.headersSent) return;
+            responded = true;
+            clearTimeout(timeout);
+            clearInterval(checkInterval);
+            res.json(payload);
+        };
+
+        const timeout = setTimeout(() => {
             if (acc.loggedIn) {
                 sendResponse({ success: true, username: acc.username });
             } else {
-                sendResponse({ success: false, error: acc.error });
+                sendResponse({ success: false, error: acc.error || 'Giriş başarısız' });
             }
-        }
-    }, 500);
+        }, 8000);
+
+        const checkInterval = setInterval(() => {
+            if (acc.loggedIn || acc.error) {
+                if (acc.loggedIn) {
+                    sendResponse({ success: true, username: acc.username });
+                } else {
+                    sendResponse({ success: false, error: acc.error });
+                }
+            }
+        }, 500);
+        return;
+    }
+
+    res.json({ success: false, error: 'Geçersiz veya zamanı dolmuş Steam Guard isteği' });
 });
 
 app.post('/api/account/nickname', (req, res) => {
