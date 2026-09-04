@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Idle - Oyun Saati Kas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0e1a;
+            --bg2: #111827;
+            --card: rgba(17, 24, 39, 0.8);
+            --steam-blue: #1b9fff;
+            --steam-dark: #1a3a5c;
+            --accent: #66c0f4;
+            --accent2: #c7d5e0;
+            --green: #4ade80;
+            --red: #f87171;
+            --orange: #fb923c;
+            --text: #e2e8f0;
+            --text2: #94a3b8;
+            --border: rgba(102, 192, 244, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Background */
+        .bg-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+            background-image:
+                linear-gradient(rgba(102, 192, 244, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(102, 192, 244, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        .bg-glow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+            background: radial-gradient(ellipse at 30% 20%, rgba(27, 159, 255, 0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 70% 80%, rgba(102, 192, 244, 0.05) 0%, transparent 60%);
+        }
+
+        .container {
+            position: relative; z-index: 1;
+            max-width: 720px; margin: 0 auto; padding: 30px 20px;
+        }
+
+        /* Header */
+        .header { text-align: center; margin-bottom: 36px; }
+
+        .header .logo-row {
+            display: inline-flex; align-items: center; gap: 14px; margin-bottom: 6px;
+        }
+
+        .header .logo-icon {
+            width: 50px; height: 50px; border-radius: 14px;
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px;
+            box-shadow: 0 0 25px rgba(27, 159, 255, 0.35);
+        }
+
+        .header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.8rem; font-weight: 900; letter-spacing: 3px;
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+
+        .header p { color: var(--text2); font-size: 0.9rem; }
+
+        /* Card */
+        .card {
+            background: var(--card); backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: 16px;
+            padding: 28px; margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+
+        .card:hover { border-color: rgba(102, 192, 244, 0.3); }
+
+        .card-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.8rem; font-weight: 600; letter-spacing: 3px;
+            text-transform: uppercase; color: var(--accent);
+            margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+        }
+
+        .card-title::after {
+            content: ''; flex: 1; height: 1px;
+            background: linear-gradient(90deg, var(--border), transparent);
+        }
+
+        /* Status badge */
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 18px; border-radius: 30px; font-size: 0.8rem; font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .status-badge.offline {
+            background: rgba(248, 113, 113, 0.12); color: var(--red);
+            border: 1px solid rgba(248, 113, 113, 0.25);
+        }
+
+        .status-badge.online {
+            background: rgba(74, 222, 128, 0.12); color: var(--green);
+            border: 1px solid rgba(74, 222, 128, 0.25);
+        }
+
+        .status-badge.idling {
+            background: rgba(27, 159, 255, 0.12); color: var(--steam-blue);
+            border: 1px solid rgba(27, 159, 255, 0.25);
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(27, 159, 255, 0); }
+            50% { box-shadow: 0 0 15px rgba(27, 159, 255, 0.15); }
+        }
+
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+        }
+
+        .offline .status-dot { background: var(--red); }
+        .online .status-dot { background: var(--green); animation: blink 2s infinite; }
+        .idling .status-dot { background: var(--steam-blue); animation: blink 1.5s infinite; }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+        }
+
+        /* Login form */
+        .form-group { margin-bottom: 16px; }
+
+        .form-group label {
+            display: block; font-size: 0.8rem; font-weight: 600;
+            color: var(--text2); margin-bottom: 6px; letter-spacing: 0.5px;
+        }
+
+        .form-group input {
+            width: 100%; padding: 14px 16px; border-radius: 10px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text); font-size: 0.95rem; font-family: 'Inter', sans-serif;
+            outline: none; transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent); box-shadow: 0 0 0 3px rgba(102, 192, 244, 0.1);
+        }
+
+        .form-group input::placeholder { color: var(--text2); }
+
+        /* Buttons */
+        .btn {
+            padding: 14px 28px; border: none; border-radius: 12px;
+            font-family: 'Orbitron', monospace; font-size: 0.85rem;
+            font-weight: 700; letter-spacing: 2px; cursor: pointer;
+            transition: all 0.3s; text-transform: uppercase;
+            display: inline-flex; align-items: center; gap: 8px;
+            justify-content: center; width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent));
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(27, 159, 255, 0.35);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none;
+        }
+
+        .btn-danger {
+            background: rgba(248, 113, 113, 0.12); color: var(--red);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(248, 113, 113, 0.2);
+            box-shadow: 0 0 15px rgba(248, 113, 113, 0.15);
+        }
+
+        .btn-success {
+            background: rgba(74, 222, 128, 0.12); color: var(--green);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .btn-success:hover {
+            background: rgba(74, 222, 128, 0.2);
+        }
+
+        /* Games grid */
+        .games-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px; max-height: 350px; overflow-y: auto;
+            padding-right: 4px; margin-bottom: 16px;
+        }
+
+        .games-grid::-webkit-scrollbar { width: 4px; }
+        .games-grid::-webkit-scrollbar-track { background: transparent; }
+        .games-grid::-webkit-scrollbar-thumb { background: rgba(102,192,244,0.2); border-radius: 4px; }
+
+        .game-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; border-radius: 8px;
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+            cursor: pointer; transition: all 0.2s; user-select: none;
+        }
+
+        .game-item:hover {
+            background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);
+        }
+
+        .game-item.selected {
+            background: rgba(27, 159, 255, 0.1); border-color: var(--steam-blue);
+            box-shadow: 0 0 10px rgba(27, 159, 255, 0.1);
+        }
+
+        .game-item .game-check {
+            width: 20px; height: 20px; border-radius: 5px;
+            border: 2px solid rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; flex-shrink: 0;
+        }
+
+        .game-item.selected .game-check {
+            background: var(--steam-blue); border-color: var(--steam-blue);
+        }
+
+        .game-item.selected .game-check::after {
+            content: '✓'; color: #fff; font-size: 12px; font-weight: 700;
+        }
+
+        .game-item .game-label {
+            font-size: 0.82rem; font-weight: 500;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .game-item .game-id {
+            font-size: 0.65rem; color: var(--text2); margin-left: auto; flex-shrink: 0;
+        }
+
+        /* Custom App ID */
+        .custom-appid {
+            display: flex; gap: 8px; margin-top: 12px;
+        }
+
+        .custom-appid input {
+            flex: 1; padding: 10px 14px; border-radius: 8px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text); font-size: 0.85rem; outline: none;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .custom-appid input:focus {
+            border-color: var(--accent);
+        }
+
+        .custom-appid button {
+            padding: 10px 18px; border-radius: 8px; border: none;
+            background: rgba(102, 192, 244, 0.15); color: var(--accent);
+            font-weight: 600; cursor: pointer; font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .custom-appid button:hover { background: rgba(102, 192, 244, 0.25); }
+
+        /* Stats */
+        .stats-row {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px; padding: 14px; text-align: center;
+        }
+
+        .stat-box .stat-val {
+            font-family: 'Orbitron', monospace; font-size: 1.1rem;
+            font-weight: 700; color: var(--accent);
+        }
+
+        .stat-box .stat-lbl {
+            font-size: 0.65rem; color: var(--text2); margin-top: 4px;
+            text-transform: uppercase; letter-spacing: 1.5px;
+        }
+
+        /* Active games list */
+        .active-games {
+            display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0;
+        }
+
+        .active-game-tag {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 20px;
+            background: rgba(27, 159, 255, 0.1); border: 1px solid rgba(27, 159, 255, 0.25);
+            font-size: 0.8rem; color: var(--accent); font-weight: 500;
+        }
+
+        .active-game-tag .tag-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green); animation: blink 2s infinite;
+        }
+
+        /* Error */
+        .error-box {
+            padding: 14px 18px; border-radius: 10px;
+            background: rgba(248, 113, 113, 0.08);
+            border: 1px solid rgba(248, 113, 113, 0.2);
+            color: var(--red); font-size: 0.85rem; margin-bottom: 16px;
+        }
+
+        /* Sections visibility */
+        .section { display: none; }
+        .section.active { display: block; animation: fadeIn 0.4s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2);
+            border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Warning box */
+        .warn-box {
+            padding: 12px 16px; border-radius: 10px; margin-bottom: 16px;
+            background: rgba(251, 146, 60, 0.08);
+            border: 1px solid rgba(251, 146, 60, 0.2);
+            color: var(--orange); font-size: 0.8rem; line-height: 1.5;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center; margin-top: 30px; padding: 20px;
+            color: var(--text2); font-size: 0.75rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 500px) {
+            .games-grid { grid-template-columns: 1fr; }
+            .stats-row { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <div class="container">
+        <div class="header">
+            <div class="logo-row">
+                <div class="logo-icon">🎮</div>
+                <h1>STEAM IDLE</h1>
+            </div>
+            <p>PC kapalıyken bile oyun saati kas</p>
+        </div>
+
+        <!-- Status Badge -->
+        <div style="text-align:center; margin-bottom: 20px;">
+            <span class="status-badge offline" id="statusBadge">
+                <span class="status-dot"></span>
+                <span id="statusText">Çevrimdışı</span>
+            </span>
+        </div>
+
+        <!-- LOGIN SECTION -->
+        <div class="section active" id="loginSection">
+            <div class="card">
+                <div class="card-title">🔐 Steam Giriş</div>
+
+                <div class="warn-box">
+                    ⚠️ Bilgilerin sadece bu sunucuda kalır, hiçbir yere gönderilmez.
+                    Kendi sunucunda çalıştır.
+                </div>
+
+                <div id="loginError"></div>
+
+                <div class="form-group">
+                    <label>Steam Kullanıcı Adı</label>
+                    <input type="text" id="username" placeholder="Kullanıcı adını gir..." autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label>Şifre</label>
+                    <input type="password" id="password" placeholder="Şifreni gir...">
+                </div>
+
+                <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">
+                    GİRİŞ YAP
+                </button>
+            </div>
+        </div>
+
+        <!-- STEAM GUARD SECTION -->
+        <div class="section" id="guardSection">
+            <div class="card">
+                <div class="card-title">🛡️ Steam Guard</div>
+
+                <p style="color: var(--text2); margin-bottom: 16px; font-size: 0.9rem;">
+                    <span id="guardInfo">Steam Guard kodunu gir</span>
+                </p>
+
+                <div id="guardError"></div>
+
+                <div class="form-group">
+                    <label>Doğrulama Kodu</label>
+                    <input type="text" id="guardCode" placeholder="XXXXX" maxlength="5"
+                           style="font-family: 'Orbitron', monospace; font-size: 1.5rem; text-align: center; letter-spacing: 8px;">
+                </div>
+
+                <button class="btn btn-primary" id="guardBtn" onclick="doSteamGuard()">
+                    DOĞRULA
+                </button>
+            </div>
+        </div>
+
+        <!-- DASHBOARD SECTION -->
+        <div class="section" id="dashSection">
+            <div class="card">
+                <div class="card-title">📊 Panel</div>
+
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <span style="color: var(--text2); font-size: 0.8rem;">Hoş geldin,</span><br>
+                    <span id="displayName" style="font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 700; color: var(--accent);"></span>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <div class="stat-val" id="uptimeDisplay">00:00:00</div>
+                        <div class="stat-lbl">Çalışma Süresi</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" id="gameCount">0</div>
+                        <div class="stat-lbl">Aktif Oyun</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" id="statusLabel">Bekliyor</div>
+                        <div class="stat-lbl">Durum</div>
+                    </div>
+                </div>
+
+                <div class="active-games" id="activeGames"></div>
+            </div>
+
+            <!-- Game Selection -->
+            <div class="card">
+                <div class="card-title">🕹️ Oyun Seç</div>
+
+                <div class="games-grid" id="gamesGrid"></div>
+
+                <div class="custom-appid">
+                    <input type="number" id="customAppId" placeholder="Özel App ID gir (ör: 730)">
+                    <button onclick="addCustomAppId()">+ Ekle</button>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-primary" style="flex: 2;" id="idleBtn" onclick="startIdle()">
+                    ▶ IDLE BAŞLAT
+                </button>
+                <button class="btn btn-danger" style="flex: 1;" onclick="doLogout()">
+                    ÇIKIŞ
+                </button>
+            </div>
+        </div>
+
+        <div class="footer">
+            Steam Idle • Kendi sunucunda çalıştır • Bilgilerin güvende
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // STATE
+        // ============================================================
+        let selectedAppIds = new Set();
+        let allGames = [];
+        let isIdling = false;
+        let statusInterval = null;
+
+        // ============================================================
+        // SECTIONS
+        // ============================================================
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function updateStatusBadge(state, text) {
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'status-badge ' + state;
+            document.getElementById('statusText').textContent = text;
+        }
+
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        // ============================================================
+        // LOGIN
+        // ============================================================
+        async function doLogin() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+            const errDiv = document.getElementById('loginError');
+
+            if (!username || !password) {
+                errDiv.innerHTML = '<div class="error-box">Kullanıcı adı ve şifre gerekli</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> GİRİŞ YAPILIYOR...';
+            errDiv.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    onLoginSuccess();
+                } else if (data.steamGuard) {
+                    const info = document.getElementById('guardInfo');
+                    info.textContent = data.type === 'email'
+                        ? 'E-postana gelen Steam Guard kodunu gir'
+                        : 'Steam mobil uygulamasındaki kodu gir';
+                    showSection('guardSection');
+                } else {
+                    errDiv.innerHTML = `<div class="error-box">❌ ${data.error}</div>`;
+                }
+            } catch (e) {
+                errDiv.innerHTML = '<div class="error-box">Sunucuya bağlanılamadı</div>';
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'GİRİŞ YAP';
+        }
+
+        // ============================================================
+        // STEAM GUARD
+        // ============================================================
+        async function doSteamGuard() {
+            const code = document.getElementById('guardCode').value.trim();
+            const btn = document.getElementById('guardBtn');
+            const errDiv = document.getElementById('guardError');
+
+            if (!code) {
+                errDiv.innerHTML = '<div class="error-box">Kodu gir</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> DOĞRULANIYOR...';
+            errDiv.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/steamguard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    onLoginSuccess();
+                } else {
+                    errDiv.innerHTML = `<div class="error-box">❌ ${data.error}</div>`;
+                }
+            } catch (e) {
+                errDiv.innerHTML = '<div class="error-box">Sunucuya bağlanılamadı</div>';
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'DOĞRULA';
+        }
+
+        // ============================================================
+        // LOGIN SUCCESS
+        // ============================================================
+        async function onLoginSuccess() {
+            updateStatusBadge('online', 'Çevrimiçi');
+            showSection('dashSection');
+            loadGames();
+            startStatusPolling();
+        }
+
+        // ============================================================
+        // GAMES
+        // ============================================================
+        async function loadGames() {
+            try {
+                const res = await fetch('/api/games');
+                allGames = await res.json();
+                renderGames();
+            } catch (e) {}
+        }
+
+        function renderGames() {
+            const grid = document.getElementById('gamesGrid');
+            grid.innerHTML = '';
+
+            allGames.forEach(game => {
+                const div = document.createElement('div');
+                div.className = 'game-item' + (selectedAppIds.has(game.appId) ? ' selected' : '');
+                div.onclick = () => toggleGame(game.appId);
+                div.innerHTML = `
+                    <div class="game-check"></div>
+                    <span class="game-label">${game.name}</span>
+                    <span class="game-id">${game.appId}</span>
+                `;
+                grid.appendChild(div);
+            });
+
+            updateIdleBtn();
+        }
+
+        function toggleGame(appId) {
+            if (selectedAppIds.has(appId)) {
+                selectedAppIds.delete(appId);
+            } else {
+                if (selectedAppIds.size >= 32) {
+                    alert('En fazla 32 oyun seçebilirsin!');
+                    return;
+                }
+                selectedAppIds.add(appId);
+            }
+            renderGames();
+        }
+
+        function addCustomAppId() {
+            const input = document.getElementById('customAppId');
+            const id = parseInt(input.value);
+            if (!id || id <= 0) return;
+
+            // Listeye ekle
+            if (!allGames.find(g => g.appId === id)) {
+                allGames.unshift({ appId: id, name: `Oyun #${id}` });
+            }
+            selectedAppIds.add(id);
+            input.value = '';
+            renderGames();
+        }
+
+        function updateIdleBtn() {
+            const btn = document.getElementById('idleBtn');
+            if (isIdling) {
+                btn.innerHTML = '⏹ IDLE DURDUR';
+                btn.className = 'btn btn-danger';
+                btn.onclick = stopIdle;
+                btn.style.flex = '2';
+            } else {
+                btn.innerHTML = `▶ IDLE BAŞLAT (${selectedAppIds.size} oyun)`;
+                btn.className = 'btn btn-primary';
+                btn.disabled = selectedAppIds.size === 0;
+                btn.onclick = startIdle;
+                btn.style.flex = '2';
+            }
+        }
+
+        // ============================================================
+        // IDLE START / STOP
+        // ============================================================
+        async function startIdle() {
+            if (selectedAppIds.size === 0) return;
+
+            try {
+                const res = await fetch('/api/idle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appIds: [...selectedAppIds] })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    isIdling = true;
+                    updateStatusBadge('idling', 'Idle Çalışıyor');
+                    updateIdleBtn();
+                    updateActiveGames();
+                }
+            } catch (e) {}
+        }
+
+        async function stopIdle() {
+            try {
+                await fetch('/api/stop', { method: 'POST' });
+                isIdling = false;
+                updateStatusBadge('online', 'Çevrimiçi');
+                updateIdleBtn();
+                document.getElementById('activeGames').innerHTML = '';
+                document.getElementById('statusLabel').textContent = 'Bekliyor';
+                document.getElementById('gameCount').textContent = '0';
+            } catch (e) {}
+        }
+
+        function updateActiveGames() {
+            const container = document.getElementById('activeGames');
+            container.innerHTML = '';
+
+            selectedAppIds.forEach(id => {
+                const game = allGames.find(g => g.appId === id);
+                const name = game ? game.name : `#${id}`;
+                container.innerHTML += `
+                    <span class="active-game-tag">
+                        <span class="tag-dot"></span>
+                        ${name}
+                    </span>
+                `;
+            });
+        }
+
+        // ============================================================
+        // LOGOUT
+        // ============================================================
+        async function doLogout() {
+            if (!confirm('Çıkış yapmak istediğine emin misin? Idle duracak.')) return;
+
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+            } catch (e) {}
+
+            isIdling = false;
+            selectedAppIds.clear();
+            if (statusInterval) clearInterval(statusInterval);
+            updateStatusBadge('offline', 'Çevrimdışı');
+            showSection('loginSection');
+        }
+
+        // ============================================================
+        // STATUS POLLING
+        // ============================================================
+        function startStatusPolling() {
+            if (statusInterval) clearInterval(statusInterval);
+
+            statusInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/status');
+                    const data = await res.json();
+
+                    if (!data.loggedIn) {
+                        isIdling = false;
+                        updateStatusBadge('offline', 'Bağlantı Kesildi');
+                        return;
+                    }
+
+                    document.getElementById('displayName').textContent = data.persona || data.username;
+                    document.getElementById('uptimeDisplay').textContent = formatUptime(data.uptime);
+
+                    if (data.games.length > 0) {
+                        isIdling = true;
+                        document.getElementById('gameCount').textContent = data.games.length;
+                        document.getElementById('statusLabel').textContent = 'Kasıyor!';
+                        updateStatusBadge('idling', 'Idle Çalışıyor');
+                    } else {
+                        isIdling = false;
+                        document.getElementById('gameCount').textContent = '0';
+                        document.getElementById('statusLabel').textContent = 'Bekliyor';
+                        updateStatusBadge('online', 'Çevrimiçi');
+                    }
+
+                    updateIdleBtn();
+                } catch (e) {}
+            }, 3000);
+        }
+
+        // ============================================================
+        // INIT - Sayfa açılınca durumu kontrol et
+        // ============================================================
+        async function init() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                if (data.loggedIn) {
+                    if (data.games.length > 0) {
+                        isIdling = true;
+                        data.games.forEach(id => selectedAppIds.add(id));
+                        updateStatusBadge('idling', 'Idle Çalışıyor');
+                    } else {
+                        updateStatusBadge('online', 'Çevrimiçi');
+                    }
+                    showSection('dashSection');
+                    loadGames();
+                    startStatusPolling();
+                    document.getElementById('displayName').textContent = data.persona || data.username;
+                    updateActiveGames();
+                }
+            } catch (e) {}
+        }
+
+        init();
+
+        // Enter tuşu ile giriş
+        document.getElementById('password').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doLogin();
+        });
+        document.getElementById('guardCode').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doSteamGuard();
+        });
+    </script>
+</body>
+</html>

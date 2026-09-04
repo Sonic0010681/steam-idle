@@ -1,7 +1,8 @@
 const express = require('express');
 const SteamUser = require('steam-user');
 const { LoginSession, EAuthTokenPlatformType } = require('steam-session');
-const QRCode = require('qrcode');
+let QRCode = null;
+try { QRCode = require('qrcode'); } catch (e) {}
 const path = require('path');
 const fs = require('fs');
 
@@ -10,42 +11,27 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================================
-// KALICI OTURUM YÖNETİMİ (SESSIONS.JSON)
 // ============================================================
-const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
-
+// HESAP KAYDI DEVRE DIŞI (GÜVENLİK & TEMİZ BAŞLANGIÇ)
+// ============================================================
+// Kullanıcı hesapları diske kaydedilmez. Herkes siteye girdiğinde 
+// sıfırdan kendi hesabını ekler ve kullanır.
 function saveAccountSession(username, refreshToken) {
-    if (!username || !refreshToken) return;
-    let data = {};
-    try {
-        if (fs.existsSync(SESSIONS_FILE)) {
-            data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
-        }
-    } catch (e) {}
-    data[username.toLowerCase()] = { username, refreshToken, lastSaved: Date.now() };
-    try {
-        fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2));
-    } catch (e) {}
+    // Güvenlik gereği hesabı diske kaydetme
 }
 
 function removeAccountSession(username) {
-    if (!username) return;
-    try {
-        if (fs.existsSync(SESSIONS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
-            delete data[username.toLowerCase()];
-            fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2));
-        }
-    } catch (e) {}
+    // Diskte kayıt tutulmuyor
 }
 
 // ============================================================
-// ÇOKLU HESAP & OTURUM VERİ YAPILARI
+// HESAP YÖNETİMİ (MAP)
 // ============================================================
-const accounts = new Map(); // username.toLowerCase() -> account state
-const pendingQrSessions = new Map(); // qrSessionId -> state
+// key: username.toLowerCase() -> account object
+const accounts = new Map();
+const pendingQrSessions = new Map();
 
-// Popüler oyunlar listesi
+// Popüler oyunlar listesi (Yedek & Varsayılan)
 const POPULAR_GAMES = [
     { appId: 730, name: 'Counter-Strike 2' },
     { appId: 570, name: 'Dota 2' },
@@ -311,92 +297,71 @@ setInterval(() => {
 }, 1000);
 
 function loadSavedSessions() {
-    try {
-        if (!fs.existsSync(SESSIONS_FILE)) return;
-        const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
-        for (const [key, sess] of Object.entries(data)) {
-            if (sess && sess.refreshToken && sess.username) {
-                console.log(`🔄 Kayıtlı oturum geri yükleniyor: ${sess.username}`);
-                const acc = getOrCreateAccount(sess.username);
-                acc.refreshToken = sess.refreshToken;
-                const client = createSteamClientForAccount(acc);
-                client.logOn({ refreshToken: sess.refreshToken, logonID: getLogonID(sess.username) });
-            }
-        }
-    } catch (e) {
-        console.error('Kayıtlı oturumlar yüklenirken hata:', e.message);
-    }
+    // Hiçbir hesabı otomatik yükleme - Herkes siteye girip kendi hesabını ekler.
 }
 
 // ============================================================
 // API ROUTES
 // ============================================================
 
-// 1. Tüm hesapları listele
-app.get('/api/accounts', (req, res) => {
+// 1. İstemcinin sahip olduğu hesapların durumunu listele (Sadece talep edilen kullanıcı adları)
+app.post('/api/accounts', (req, res) => {
+    const { usernames } = req.body;
+    if (!usernames || !Array.isArray(usernames) || usernames.length === 0) {
+        return res.json({ success: true, accounts: [] });
+    }
+
     const list = [];
-    for (const acc of accounts.values()) {
-        const uptime = (acc.startTime && acc.games && acc.games.length > 0)
-            ? Math.floor((Date.now() - acc.startTime) / 1000)
-            : 0;
-        list.push({
-            username: acc.username,
-            persona: acc.persona || acc.username,
-            steamID: acc.steamID,
-            loggedIn: acc.loggedIn,
-            playingBlocked: acc.playingBlocked || false,
-            blockedByApp: acc.blockedByApp || null,
-            steamGuardNeeded: acc.steamGuardNeeded,
-            steamGuardType: acc.steamGuardType,
-            games: acc.games || [],
-            ownedGamesCount: acc.ownedGames ? acc.ownedGames.length : 0,
-            error: acc.error,
-            uptime: uptime,
-            totalSeconds: acc.totalSeconds || 0
-        });
+    for (const u of usernames) {
+        const key = String(u).toLowerCase().trim();
+        const acc = accounts.get(key);
+        if (acc) {
+            const uptime = (acc.startTime && acc.games && acc.games.length > 0)
+                ? Math.floor((Date.now() - acc.startTime) / 1000)
+                : 0;
+            list.push({
+                username: acc.username,
+                persona: acc.persona || acc.username,
+                steamID: acc.steamID,
+                loggedIn: acc.loggedIn,
+                playingBlocked: acc.playingBlocked || false,
+                blockedByApp: acc.blockedByApp || null,
+                steamGuardNeeded: acc.steamGuardNeeded,
+                steamGuardType: acc.steamGuardType,
+                games: acc.games || [],
+                ownedGamesCount: acc.ownedGames ? acc.ownedGames.length : 0,
+                error: acc.error,
+                uptime: uptime,
+                totalSeconds: acc.totalSeconds || 0
+            });
+        }
     }
     res.json({ success: true, accounts: list });
 });
 
-// 2. Tek bir hesabın detaylı durumunu al
+// GET /api/accounts geriye dönük uyumluluk - Parametresiz çağrılırsa boş liste döner!
+app.get('/api/accounts', (req, res) => {
+    res.json({ success: true, accounts: [] });
+});
+
+// 2. Tek bir hesabın durumunu sorgula (Sadece kullanıcı adı belirtilmişse!)
 app.get('/api/status', (req, res) => {
     const username = req.query.username;
 
     if (!username) {
-        const first = accounts.values().next().value;
-        if (!first) {
-            return res.json({ loggedIn: false, accountsCount: 0 });
-        }
-        const uptime = (first.startTime && first.games && first.games.length > 0)
-            ? Math.floor((Date.now() - first.startTime) / 1000)
-            : 0;
-        return res.json({
-            loggedIn: first.loggedIn,
-            username: first.username,
-            persona: first.persona || first.username,
-            steamID: first.steamID,
-            playingBlocked: first.playingBlocked || false,
-            blockedByApp: first.blockedByApp || null,
-            games: first.games || [],
-            ownedGames: (first.ownedGames && first.ownedGames.length > 0) ? first.ownedGames : POPULAR_GAMES,
-            steamGuardNeeded: first.steamGuardNeeded,
-            steamGuardType: first.steamGuardType,
-            error: first.error,
-            uptime: uptime,
-            totalSeconds: first.totalSeconds || 0,
-            accountsCount: accounts.size
-        });
+        return res.json({ loggedIn: false });
     }
 
     const key = String(username).toLowerCase().trim();
     const acc = accounts.get(key);
     if (!acc) {
-        return res.json({ success: false, error: 'Hesap bulunamadı' });
+        return res.json({ loggedIn: false });
     }
 
     const uptime = (acc.startTime && acc.games && acc.games.length > 0)
         ? Math.floor((Date.now() - acc.startTime) / 1000)
         : 0;
+
     res.json({
         success: true,
         loggedIn: acc.loggedIn,
@@ -423,7 +388,13 @@ app.post('/api/qr-start', async (req, res) => {
         const qrSessionId = 'qr_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
 
         const { qrChallengeUrl } = await loginSession.startWithQR();
-        const qrDataUrl = await QRCode.toDataURL(qrChallengeUrl, { margin: 2, width: 240 });
+        let qrDataUrl = '';
+        if (QRCode) {
+            try { qrDataUrl = await QRCode.toDataURL(qrChallengeUrl, { margin: 2, width: 240 }); } catch (e) {}
+        }
+        if (!qrDataUrl) {
+            qrDataUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(qrChallengeUrl);
+        }
 
         const sessionState = {
             qrSessionId,
@@ -587,25 +558,101 @@ app.post('/api/steamguard', (req, res) => {
     }
 
     targetAcc.steamGuardNeeded = false;
-    targetAcc.pendingSteamGuardCallback(String(code).trim().toUpperCase());
+    const cb = targetAcc.pendingSteamGuardCallback;
     targetAcc.pendingSteamGuardCallback = null;
+
+    let responded = false;
+    const sendResponse = (payload) => {
+        if (responded || res.headersSent) return;
+        responded = true;
+        clearTimeout(timeout);
+        clearInterval(checkInterval);
+        res.json(payload);
+    };
 
     const timeout = setTimeout(() => {
         if (targetAcc.loggedIn) {
-            res.json({ success: true, username: targetAcc.username });
+            sendResponse({ success: true, username: targetAcc.username });
         } else {
-            res.json({ success: false, error: targetAcc.error || 'Giriş başarısız' });
+            sendResponse({ success: false, error: targetAcc.error || 'Giriş başarısız' });
         }
     }, 8000);
 
     const checkInterval = setInterval(() => {
         if (targetAcc.loggedIn || targetAcc.error) {
-            clearTimeout(timeout);
-            clearInterval(checkInterval);
             if (targetAcc.loggedIn) {
-                res.json({ success: true, username: targetAcc.username });
+                sendResponse({ success: true, username: targetAcc.username });
             } else {
-                res.json({ success: false, error: targetAcc.error });
+                sendResponse({ success: false, error: targetAcc.error });
+            }
+        }
+    }, 300);
+
+    try {
+        cb(String(code).trim().toUpperCase());
+    } catch (e) {
+        sendResponse({ success: false, error: e.message });
+    }
+});
+
+// 6.5 Tarayıcı localStorage tokenı ile otomatik yeniden bağlan
+app.post('/api/reconnect', (req, res) => {
+    const { username, refreshToken } = req.body;
+
+    if (!username || !refreshToken) {
+        return res.json({ success: false, error: 'Kullanıcı adı ve jeton gerekli' });
+    }
+
+    const key = String(username).toLowerCase().trim();
+    let acc = accounts.get(key);
+
+    if (acc && acc.loggedIn) {
+        return res.json({ success: true, username: acc.username, refreshToken: acc.refreshToken });
+    }
+
+    acc = getOrCreateAccount(username);
+    acc.refreshToken = refreshToken;
+    acc.error = null;
+
+    const client = createSteamClientForAccount(acc);
+
+    let responded = false;
+    const sendResponse = (payload) => {
+        if (responded || res.headersSent) return;
+        responded = true;
+        clearTimeout(timeout);
+        clearInterval(checkInterval);
+        res.json(payload);
+    };
+
+    client.once('loggedOn', () => {
+        sendResponse({ success: true, username: acc.username, refreshToken: acc.refreshToken });
+    });
+
+    client.once('error', (err) => {
+        sendResponse({ success: false, error: getSteamErrorMessage(err) });
+    });
+
+    try {
+        client.logOn({ refreshToken: refreshToken, logonID: getLogonID(username) });
+    } catch (err) {
+        return res.json({ success: false, error: err.message });
+    }
+
+    const timeout = setTimeout(() => {
+        if (acc.loggedIn) {
+            sendResponse({ success: true, username: acc.username, refreshToken: acc.refreshToken });
+        } else {
+            sendResponse({ success: false, error: acc.error || 'Yeniden bağlanma zaman aşımı' });
+        }
+    }, 8000);
+
+    const checkInterval = setInterval(() => {
+        if (acc.loggedIn || acc.error) {
+            if (acc.loggedIn) {
+                sendResponse({ success: true, username: acc.username, refreshToken: acc.refreshToken });
+            } else {
+                sendResponse({ success: false, error: acc.error });
             }
         }
     }, 300);
@@ -735,15 +782,30 @@ app.get('/api/games', (req, res) => {
     res.json(POPULAR_GAMES);
 });
 
+// 13. Ana Sayfa (Index Route Fallback)
+app.get('/', (req, res) => {
+    const indexPath = path.join(__dirname, 'public', 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        const rootIndex = path.join(__dirname, 'index.html');
+        if (fs.existsSync(rootIndex)) {
+            res.sendFile(rootIndex);
+        } else {
+            res.send('Steam Idle Pro Backend Running!');
+        }
+    }
+});
+
 // ============================================================
 // SUNUCUYU BAŞLAT
 // ============================================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`
 ╔══════════════════════════════════════════════════════╗
 ║     🎮 STEAM IDLE PRO - ÇOKLU HESAP + QR KOD AKTİF   ║
-║     http://localhost:${PORT}                           ║
+║     http://0.0.0.0:${PORT}                             ║
 ║                                                      ║
 ║     📱 Steam Mobil QR Tarama Hazır                   ║
 ║     👥 Sınırsız Çoklu Hesap Ekleme Hazır             ║

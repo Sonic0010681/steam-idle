@@ -643,7 +643,7 @@
         }
 
         // ============================================================
-        // QR CODE LOGIN FLOW
+        // QR CODE LOGIN FLOW (60 Saniyede Bir Otomatik Yenilenir)
         // ============================================================
         async function startQrLogin() {
             if (qrPollingInterval) clearInterval(qrPollingInterval);
@@ -656,20 +656,24 @@
                 qrBox.innerHTML = '<div class="qr-scan-line"></div><span class="spinner" style="width: 30px; height: 30px;"></span>';
             }
             if (qrStatusMsg) {
-                qrStatusMsg.innerHTML = '⏱️ Yenileniyor: <strong id="qrTimerVal" style="color: var(--orange);">60s</strong>';
+                qrStatusMsg.innerHTML = '⏳ QR Kod Oluşturuluyor...';
             }
 
             try {
                 const res = await fetch('/api/qr-start', { method: 'POST' });
                 const data = await res.json();
 
-                if (data.success) {
+                if (data.success && data.qrDataUrl) {
                     currentQrSessionId = data.qrSessionId;
                     if (qrBox) {
                         qrBox.innerHTML = `<div class="qr-scan-line"></div><img src="${data.qrDataUrl}" alt="Steam QR Login">`;
                     }
 
                     qrCountdownSec = 60;
+                    if (qrStatusMsg) {
+                        qrStatusMsg.innerHTML = '⏱️ Kalan Süre: <strong id="qrTimerVal" style="color: var(--accent); font-family: Orbitron, monospace; font-size: 0.95rem;">60s</strong> (1 dk sonra otomatik yenilenir)';
+                    }
+
                     qrCountdownInterval = setInterval(() => {
                         qrCountdownSec--;
                         const t = document.getElementById('qrTimerVal');
@@ -689,15 +693,30 @@
                                 clearInterval(qrPollingInterval);
                                 clearInterval(qrCountdownInterval);
                                 if (qrStatusMsg) {
-                                    qrStatusMsg.innerHTML = '<span style="color: var(--green); font-weight: 700;">✅ QR Başarıyla Tarandı!</span>';
+                                    qrStatusMsg.innerHTML = '<span style="color: var(--green); font-weight: 700;">✅ QR Başarıyla Tarandı! Giriş Yapılıyor...</span>';
                                 }
                                 await loadAccounts(cData.username);
+                            } else if (cData.error) {
+                                clearInterval(qrPollingInterval);
+                                clearInterval(qrCountdownInterval);
+                                if (qrStatusMsg) {
+                                    qrStatusMsg.innerHTML = `<span style="color: var(--orange);">${cData.error} Yeniden deneniyor...</span>`;
+                                }
+                                setTimeout(startQrLogin, 2000);
                             }
                         } catch (e) {}
                     }, 1500);
+                } else {
+                    if (qrStatusMsg) {
+                        qrStatusMsg.innerHTML = `<span style="color: var(--red);">⚠️ ${data.error || 'QR oluşturulamadı.'} 5s sonra tekrar deneniyor...</span>`;
+                    }
+                    setTimeout(startQrLogin, 5000);
                 }
             } catch (e) {
-                if (qrStatusMsg) qrStatusMsg.textContent = 'QR oluşturulamadı.';
+                if (qrStatusMsg) {
+                    qrStatusMsg.innerHTML = '<span style="color: var(--red);">⚠️ Bağlantı hatası. 5s içinde tekrar deneniyor...</span>';
+                }
+                setTimeout(startQrLogin, 5000);
             }
         }
 
@@ -732,7 +751,11 @@
                 } else if (data.steamGuard) {
                     activeUsername = username;
                     const prompt = document.getElementById('guardPrompt');
-                    prompt.innerHTML = `<strong>[${username}]</strong> Hesabın için Steam Guard kodu gerekli. Kodu girin:`;
+                    const locationText = data.type === 'email'
+                        ? '📧 <strong style="color: var(--green);">E-POSTA ADRESİNE</strong> gönderilen 5 haneli Steam Guard kodunu'
+                        : '📱 <strong style="color: var(--accent);">STEAM MOBİL UYGULAMANA</strong> (Guard sekmesi) gelen 5 haneli kodu';
+                    
+                    prompt.innerHTML = `🔑 <strong>[${username}]</strong> Hesabı için ${locationText} aşağıya girin:`;
                     showSection('guardSection');
                 } else {
                     errDiv.innerHTML = `<div class="error-box">❌ ${data.error}</div>`;
@@ -795,7 +818,14 @@
         // ============================================================
         async function loadAccounts(selectUser = null) {
             try {
-                const res = await fetch('/api/accounts');
+                let saved = JSON.parse(localStorage.getItem('mySteamIdleAccounts') || '{}');
+                const usernames = Object.keys(saved);
+
+                const res = await fetch('/api/accounts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernames })
+                });
                 const data = await res.json();
                 accountsList = data.accounts || [];
 
@@ -1128,9 +1158,56 @@
             } catch (e) {}
         }
 
+        // ============================================================
+        // BROWSER LOCALSTORAGE SESSION MANAGEMENT (TÜM GİZLİLİK KORUNUR)
+        // ============================================================
+        // Oturum anahtarları SADECE kullanıcının kendi tarayıcısında saklanır.
+        // Başka tarayıcı/cihaz/IP siteye girdiğinde 0 hesap ile temiz ekran görür.
+        function saveClientAccountSession(username, refreshToken) {
+            if (!username || !refreshToken) return;
+            try {
+                let saved = JSON.parse(localStorage.getItem('mySteamIdleAccounts') || '{}');
+                saved[username.toLowerCase()] = { username, refreshToken, savedAt: Date.now() };
+                localStorage.setItem('mySteamIdleAccounts', JSON.stringify(saved));
+            } catch(e) {}
+        }
+
+        function removeClientAccountSession(username) {
+            if (!username) return;
+            try {
+                let saved = JSON.parse(localStorage.getItem('mySteamIdleAccounts') || '{}');
+                delete saved[username.toLowerCase()];
+                localStorage.setItem('mySteamIdleAccounts', JSON.stringify(saved));
+            } catch(e) {}
+        }
+
+        async function restoreBrowserSavedAccounts() {
+            try {
+                let saved = JSON.parse(localStorage.getItem('mySteamIdleAccounts') || '{}');
+                const entries = Object.values(saved);
+                for (const item of entries) {
+                    if (item && item.username && item.refreshToken) {
+                        try {
+                            const res = await fetch('/api/reconnect', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ username: item.username, refreshToken: item.refreshToken })
+                            });
+                            const data = await res.json();
+                            if (!data.success) {
+                                removeClientAccountSession(item.username);
+                            }
+                        } catch(e) {}
+                    }
+                }
+            } catch(e) {}
+        }
+
         async function doLogoutAccount() {
             if (!activeUsername) return;
             if (!confirm(`[${activeUsername}] hesabını kaldırmak istediğinize emin misiniz?`)) return;
+
+            removeClientAccountSession(activeUsername);
 
             try {
                 await fetch('/api/logout', {
@@ -1156,6 +1233,10 @@
                         if (data.success || data.loggedIn !== undefined) {
                             updateActiveAccountBadge(data);
 
+                            if (data.refreshToken) {
+                                saveClientAccountSession(data.username, data.refreshToken);
+                            }
+
                             if (data.ownedGames && data.ownedGames.length > allGames.length) {
                                 allGames = data.ownedGames;
                                 renderGames(document.getElementById('gameSearch') ? document.getElementById('gameSearch').value : '');
@@ -1179,6 +1260,7 @@
         // INIT
         // ============================================================
         async function init() {
+            await restoreBrowserSavedAccounts();
             await loadPopularGames();
             await loadAccounts();
             startRealtimePolling();
