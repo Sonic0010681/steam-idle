@@ -791,9 +791,13 @@
                 const data = await res.json();
 
                 if (data.success) {
+                    if (data.username && data.refreshToken) {
+                        saveClientAccountSession(data.username, data.refreshToken);
+                    }
                     await loadAccounts(activeUsername);
                 } else {
-                    errDiv.innerHTML = `<div class="error-box">❌ ${data.error}</div>`;
+                    const msg = data.error || 'Steam Guard kodu geçersiz veya süresi dolmuş olabilir.';
+                    errDiv.innerHTML = `<div class="error-box">❌ ${msg}</div>`;
                 }
             } catch (e) {
                 errDiv.innerHTML = '<div class="error-box">Sunucuya bağlanılamadı</div>';

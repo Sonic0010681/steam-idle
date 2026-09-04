@@ -572,18 +572,18 @@ app.post('/api/steamguard', (req, res) => {
 
     const timeout = setTimeout(() => {
         if (targetAcc.loggedIn) {
-            sendResponse({ success: true, username: targetAcc.username });
+            sendResponse({ success: true, username: targetAcc.username, refreshToken: targetAcc.refreshToken });
         } else {
-            sendResponse({ success: false, error: targetAcc.error || 'Giriş başarısız' });
+            sendResponse({ success: false, error: targetAcc.error || 'Steam Guard kodu geçersiz veya zaman aşımına uğradı' });
         }
     }, 8000);
 
     const checkInterval = setInterval(() => {
         if (targetAcc.loggedIn || targetAcc.error) {
             if (targetAcc.loggedIn) {
-                sendResponse({ success: true, username: targetAcc.username });
+                sendResponse({ success: true, username: targetAcc.username, refreshToken: targetAcc.refreshToken });
             } else {
-                sendResponse({ success: false, error: targetAcc.error });
+                sendResponse({ success: false, error: targetAcc.error || 'Steam Guard kodu geçersiz' });
             }
         }
     }, 300);
@@ -591,7 +591,7 @@ app.post('/api/steamguard', (req, res) => {
     try {
         cb(String(code).trim().toUpperCase());
     } catch (e) {
-        sendResponse({ success: false, error: e.message });
+        sendResponse({ success: false, error: e.message || 'Kod işlenirken hata oluştu' });
     }
 });
 
