@@ -3,1219 +3,714 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steam Idle - Oyun Saati Kasma</title>
+    <title>Steam Idle Pro - Saat Kasma (Çoklu Hesap & QR Giriş)</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-        /* THEME COLOR SYSTEM */
         :root {
-            --bg: #070a14;
-            --sidebar-bg: rgba(12, 17, 32, 0.88);
-            --card-bg: rgba(18, 26, 47, 0.75);
-            --card-border: rgba(0, 210, 255, 0.18);
-            --neon-primary: #00d2ff;
-            --neon-secondary: #8b5cf6;
+            --bg: #0a0e1a;
+            --bg2: #111827;
+            --card: rgba(17, 24, 39, 0.85);
             --steam-blue: #1b9fff;
-            --green: #10b981;
-            --green-glow: rgba(16, 185, 129, 0.3);
-            --red: #ef4444;
-            --orange: #f59e0b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --gold: #f59e0b;
-        }
-
-        /* CYBERPUNK THEME */
-        body.theme-cyberpunk {
-            --bg: #0d0e08;
-            --sidebar-bg: rgba(22, 23, 14, 0.92);
-            --card-bg: rgba(30, 31, 18, 0.8);
-            --card-border: rgba(254, 215, 0, 0.25);
-            --neon-primary: #fed700;
-            --neon-secondary: #00e5ff;
-            --text-main: #ffffff;
-            --gold: #fed700;
-        }
-
-        /* CRIMSON RED THEME */
-        body.theme-crimson {
-            --bg: #0f0709;
-            --sidebar-bg: rgba(24, 11, 15, 0.9);
-            --card-bg: rgba(35, 16, 22, 0.8);
-            --card-border: rgba(244, 63, 94, 0.25);
-            --neon-primary: #f43f5e;
-            --neon-secondary: #fb7185;
-            --text-main: #fff0f3;
-        }
-
-        /* SYNTHWAVE VIOLET THEME */
-        body.theme-synthwave {
-            --bg: #0d0614;
-            --sidebar-bg: rgba(20, 10, 32, 0.9);
-            --card-bg: rgba(32, 16, 52, 0.8);
-            --card-border: rgba(217, 70, 239, 0.25);
-            --neon-primary: #d946ef;
-            --neon-secondary: #8b5cf6;
-            --text-main: #fae8ff;
-        }
-
-        /* MATRIX GREEN THEME */
-        body.theme-matrix {
-            --bg: #050e09;
-            --sidebar-bg: rgba(8, 24, 15, 0.9);
-            --card-bg: rgba(12, 38, 24, 0.8);
-            --card-border: rgba(34, 197, 94, 0.25);
-            --neon-primary: #22c55e;
-            --neon-secondary: #10b981;
-            --text-main: #f0fdf4;
+            --steam-dark: #1a3a5c;
+            --accent: #66c0f4;
+            --accent2: #c7d5e0;
+            --green: #4ade80;
+            --red: #f87171;
+            --orange: #fb923c;
+            --text: #e2e8f0;
+            --text2: #94a3b8;
+            --border: rgba(102, 192, 244, 0.18);
         }
 
         body {
             font-family: 'Inter', sans-serif;
             background: var(--bg);
-            color: var(--text-main);
+            color: var(--text);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-            transition: background 0.4s ease;
         }
 
-        /* Animated Grid & Glow */
+        /* Background */
         .bg-grid {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
             background-image:
-                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-            background-size: 50px 50px;
+                linear-gradient(rgba(102, 192, 244, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(102, 192, 244, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px; pointer-events: none;
+        }
+
+        .bg-glow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+            background: radial-gradient(ellipse at 30% 20%, rgba(27, 159, 255, 0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 70% 80%, rgba(102, 192, 244, 0.05) 0%, transparent 60%);
             pointer-events: none;
         }
 
-        .bg-glow-1 {
-            position: fixed; top: -10%; left: -10%; width: 50vw; height: 50vw; z-index: 0;
-            background: radial-gradient(circle, var(--neon-primary) 0.08, transparent 70%);
-            pointer-events: none; opacity: 0.18; transition: background 0.4s ease;
-            animation: pulseGlowBg 6s ease-in-out infinite alternate;
+        .container {
+            position: relative; z-index: 1;
+            max-width: 840px; margin: 0 auto; padding: 24px 18px;
         }
 
-        .bg-glow-2 {
-            position: fixed; bottom: -10%; right: -10%; width: 50vw; height: 50vw; z-index: 0;
-            background: radial-gradient(circle, var(--neon-secondary) 0.08, transparent 70%);
-            pointer-events: none; opacity: 0.18; transition: background 0.4s ease;
-            animation: pulseGlowBg 8s ease-in-out infinite alternate;
+        /* Header */
+        .header { text-align: center; margin-bottom: 22px; }
+
+        .header .logo-row {
+            display: inline-flex; align-items: center; gap: 14px; margin-bottom: 6px;
         }
 
-        @keyframes pulseGlowBg {
-            0% { transform: scale(1); opacity: 0.15; }
-            100% { transform: scale(1.15); opacity: 0.25; }
-        }
-
-        .app-wrapper {
-            position: relative; z-index: 1; display: flex; flex: 1; min-height: 100vh;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            width: 320px; background: var(--sidebar-bg); backdrop-filter: blur(20px);
-            border-right: 1px solid var(--card-border); display: flex; flex-direction: column;
-            padding: 22px 18px; transition: all 0.3s ease; flex-shrink: 0;
-        }
-
-        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; padding: 0 6px; }
-
-        .brand-icon {
-            width: 44px; height: 44px; border-radius: 12px;
-            background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary));
+        .header .logo-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent));
             display: flex; align-items: center; justify-content: center;
-            font-size: 22px; color: #000; box-shadow: 0 0 20px var(--neon-primary);
-            animation: iconFloat 3s ease-in-out infinite alternate;
+            font-size: 24px;
+            box-shadow: 0 0 25px rgba(27, 159, 255, 0.35);
         }
 
-        @keyframes iconFloat {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(-4px); box-shadow: 0 0 30px var(--neon-primary); }
+        .header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.8rem; font-weight: 900; letter-spacing: 3px;
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
 
-        .brand-text h1 {
-            font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900; letter-spacing: 2px;
-            background: linear-gradient(135deg, #fff, var(--neon-primary));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        .header p { color: var(--text2); font-size: 0.85rem; }
+
+        /* Master Controls Bar */
+        .master-bar {
+            background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);
+            border-radius: 14px; padding: 12px 18px; margin-bottom: 18px;
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            flex-wrap: wrap;
         }
-
-        .brand-text p { font-size: 0.7rem; color: var(--text-muted); font-weight: 500; }
-
-        .master-box {
-            background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border);
-            border-radius: 14px; padding: 14px; margin-bottom: 20px; transition: all 0.3s;
-        }
-
-        .master-box:hover { border-color: var(--neon-primary); box-shadow: 0 0 15px rgba(0,210,255,0.1); }
 
         .master-title {
-            font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 800;
-            color: var(--neon-primary); letter-spacing: 1.5px; text-transform: uppercase;
-            margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+            font-family: 'Orbitron', monospace; font-size: 0.8rem; font-weight: 700;
+            color: var(--accent); display: flex; align-items: center; gap: 8px;
         }
 
         .master-btns { display: flex; gap: 8px; }
 
         .btn-master {
-            flex: 1; padding: 9px 8px; border-radius: 8px; border: none;
-            font-family: 'Orbitron', monospace; font-size: 0.68rem; font-weight: 800;
-            cursor: pointer; transition: all 0.2s ease; text-transform: uppercase;
-            display: flex; align-items: center; justify-content: center; gap: 4px;
+            padding: 8px 14px; border-radius: 8px; border: none;
+            font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s; text-transform: uppercase;
         }
 
         .btn-master-start {
-            background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary));
-            color: #000; box-shadow: 0 4px 15px rgba(0, 210, 255, 0.2);
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent));
+            color: #fff; box-shadow: 0 2px 10px rgba(27, 159, 255, 0.25);
         }
 
-        .btn-master-start:hover { transform: translateY(-2px); filter: brightness(1.15); box-shadow: 0 6px 20px var(--neon-primary); }
+        .btn-master-start:hover { transform: translateY(-1px); filter: brightness(1.1); }
 
         .btn-master-stop {
-            background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3);
+            background: rgba(248, 113, 113, 0.15); color: var(--red);
+            border: 1px solid rgba(248, 113, 113, 0.3);
         }
 
-        .btn-master-stop:hover { background: rgba(239, 68, 68, 0.25); transform: translateY(-2px); }
+        .btn-master-stop:hover { background: rgba(248, 113, 113, 0.25); }
 
-        .accounts-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 12px; padding: 0 4px;
+        /* Multi-Account Bar */
+        .accounts-bar {
+            display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px;
+            margin-bottom: 18px;
         }
 
-        .accounts-header span {
-            font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 700;
-            letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase;
+        .accounts-bar::-webkit-scrollbar { height: 4px; }
+        .accounts-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        .acc-tab {
+            padding: 8px 16px; border-radius: 10px; background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08); font-size: 0.82rem; font-weight: 600;
+            color: var(--text2); cursor: pointer; display: flex; align-items: center; gap: 8px;
+            white-space: nowrap; transition: all 0.2s;
         }
 
-        .btn-add-account {
-            width: 32px; height: 32px; border-radius: 8px;
-            background: rgba(0, 210, 255, 0.1); border: 1px solid var(--card-border);
-            color: var(--neon-primary); font-size: 1.2rem; font-weight: bold;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: all 0.2s;
+        .acc-tab:hover { background: rgba(255,255,255,0.06); color: var(--text); border-color: var(--border); }
+
+        .acc-tab.active {
+            background: rgba(27, 159, 255, 0.12); color: var(--steam-blue);
+            border-color: var(--steam-blue); box-shadow: 0 0 12px rgba(27, 159, 255, 0.15);
         }
 
-        .btn-add-account:hover { background: var(--neon-primary); color: #000; box-shadow: 0 0 15px var(--neon-primary); transform: scale(1.1); }
-
-        .accounts-list {
-            display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; padding-right: 4px;
+        .acc-tab-add {
+            background: rgba(102, 192, 244, 0.08); border: 1px dashed var(--border);
+            color: var(--accent); font-family: 'Orbitron', monospace; font-size: 0.72rem;
+            font-weight: 700;
         }
 
-        .accounts-list::-webkit-scrollbar { width: 4px; }
-        .accounts-list::-webkit-scrollbar-thumb { background: var(--neon-primary); border-radius: 4px; }
+        .acc-tab-add:hover { background: var(--accent); color: #000; }
 
-        .account-card {
-            background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;
-            cursor: pointer; transition: all 0.25s ease; position: relative;
-        }
-
-        .account-card:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--card-border); transform: translateX(3px); }
-
-        .account-card.active {
-            background: linear-gradient(135deg, rgba(0, 210, 255, 0.12), rgba(139, 92, 246, 0.1));
-            border-color: var(--neon-primary); box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
-        }
-
-        .acc-avatar {
-            width: 40px; height: 40px; border-radius: 10px;
-            background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 800; font-size: 1rem; color: var(--neon-primary); position: relative; flex-shrink: 0;
-        }
-
-        .acc-status-dot {
-            width: 9px; height: 9px; border-radius: 50%; position: absolute; bottom: -2px; right: -2px; border: 2px solid #0c1120;
-        }
-
-        .acc-status-dot.idling { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulseDot 1.5s infinite; }
-        .acc-status-dot.online { background: var(--neon-primary); }
-        .acc-status-dot.invisible { background: #94a3b8; }
-        .acc-status-dot.guard { background: var(--orange); }
-        .acc-status-dot.offline { background: var(--red); }
-
-        @keyframes pulseDot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.6; } }
-
-        .acc-info { overflow: hidden; flex: 1; }
-        .acc-name { font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700; color: var(--text-main); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-        .acc-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-
-        .btn-add-full {
-            margin-top: 14px; width: 100%; padding: 11px; border-radius: 10px;
-            border: 1px dashed var(--card-border); background: rgba(0, 210, 255, 0.04);
-            color: var(--neon-primary); font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 700;
-            letter-spacing: 1px; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-
-        .btn-add-full:hover { background: rgba(0, 210, 255, 0.15); border-style: solid; box-shadow: 0 0 15px var(--neon-primary); transform: translateY(-2px); }
-
-        .main-content { flex: 1; padding: 28px 34px; max-width: 980px; margin: 0 auto; width: 100%; }
-
-        .top-navbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 14px; flex-wrap: wrap; }
-
-        .theme-selector {
-            display: flex; align-items: center; gap: 6px;
-            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 6px;
-        }
-
-        .theme-pill { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease; }
-        .theme-pill:hover, .theme-pill.active { transform: scale(1.25); border-color: #fff; box-shadow: 0 0 10px #fff; }
-        .pill-cyber { background: linear-gradient(135deg, #00d2ff, #8b5cf6); }
-        .pill-cyberpunk { background: linear-gradient(135deg, #fed700, #00e5ff); }
-        .pill-crimson { background: linear-gradient(135deg, #f43f5e, #fb7185); }
-        .pill-synthwave { background: linear-gradient(135deg, #d946ef, #8b5cf6); }
-        .pill-matrix { background: linear-gradient(135deg, #22c55e, #10b981); }
-
-        .btn-leaderboard {
-            padding: 9px 18px; border-radius: 12px; border: 1px solid var(--gold);
-            background: rgba(245, 158, 11, 0.12); color: var(--gold);
-            font-family: 'Orbitron', monospace; font-size: 0.78rem; font-weight: 800;
-            cursor: pointer; transition: all 0.25s; display: flex; align-items: center; gap: 8px;
-        }
-
-        .btn-leaderboard:hover { background: var(--gold); color: #000; box-shadow: 0 0 20px rgba(245, 158, 11, 0.4); transform: translateY(-2px); }
-
+        /* Card */
         .card {
-            background: var(--card-bg); backdrop-filter: blur(20px);
-            border: 1px solid var(--card-border); border-radius: 18px; padding: 26px; margin-bottom: 22px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            background: var(--card); backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: 16px;
+            padding: 22px; margin-bottom: 18px;
             transition: border-color 0.3s;
         }
 
-        .card:hover { border-color: rgba(0, 210, 255, 0.35); }
+        .card:hover { border-color: rgba(102, 192, 244, 0.35); }
 
-        @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-
-        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .card-title { font-family: 'Orbitron', monospace; font-size: 0.9rem; font-weight: 800; letter-spacing: 2px; color: var(--neon-primary); text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
-
-        /* Login Option Tabs */
-        .login-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; }
-        .login-tab-btn {
-            padding: 11px 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
-            background: rgba(255,255,255,0.03); color: var(--text-muted); font-family: 'Orbitron', monospace;
-            font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.25s; flex: 1; text-align: center;
+        .card-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.8rem; font-weight: 700; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--accent);
+            margin-bottom: 18px; display: flex; align-items: center; gap: 10px;
         }
 
-        .login-tab-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
-
-        .login-tab-btn.active {
-            background: rgba(0, 210, 255, 0.15); border-color: var(--neon-primary); color: var(--neon-primary);
-            box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
+        .card-title::after {
+            content: ''; flex: 1; height: 1px;
+            background: linear-gradient(90deg, var(--border), transparent);
         }
 
-        /* High-Tech QR Code Scanner & Container */
-        .qr-container {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 26px; background: rgba(255,255,255,0.02); border: 1px solid var(--card-border);
-            border-radius: 18px; margin-bottom: 18px; text-align: center; position: relative;
+        /* Dual Login Layout */
+        .login-dual-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
         }
 
-        .qr-img-box {
-            position: relative; padding: 16px; background: #ffffff; border-radius: 16px;
-            box-shadow: 0 0 30px var(--neon-primary); margin-bottom: 16px; overflow: hidden;
-            min-width: 250px; min-height: 250px; display: flex; align-items: center; justify-content: center;
+        @media (max-width: 680px) {
+            .login-dual-grid { grid-template-columns: 1fr; }
         }
 
-        .qr-img-box img { width: 220px; height: 220px; display: block; border-radius: 8px; }
+        .login-sub-box {
+            background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px; padding: 20px; text-align: center;
+        }
 
-        /* Laser Scan Line Overlay */
+        .qr-box {
+            width: 210px; height: 210px; margin: 12px auto; background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border); border-radius: 12px; display: flex;
+            align-items: center; justify-content: center; position: relative; overflow: hidden;
+        }
+
+        .qr-box img { width: 100%; height: 100%; display: block; border-radius: 10px; }
+
         .qr-scan-line {
-            position: absolute; top: 5%; left: 0; width: 100%; height: 4px;
-            background: linear-gradient(90deg, transparent, var(--neon-primary), #ffffff, var(--neon-primary), transparent);
-            box-shadow: 0 0 15px var(--neon-primary), 0 0 25px var(--neon-primary);
-            animation: laserScan 2s ease-in-out infinite alternate; pointer-events: none; z-index: 10;
+            position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            box-shadow: 0 0 8px var(--accent); animation: scanLine 2s linear infinite;
         }
 
-        @keyframes laserScan {
-            0% { top: 5%; }
-            100% { top: 92%; }
+        @keyframes scanLine {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
         }
 
-        .qr-instructions { font-size: 0.85rem; color: var(--text-main); line-height: 1.6; max-width: 440px; }
-        .qr-instructions ol { text-align: left; margin-left: 20px; margin-top: 10px; color: var(--text-muted); font-size: 0.82rem; }
-
-        /* Account Header Bar */
-        .account-header-bar {
-            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 22px;
-            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 16px 22px;
+        /* Status badge */
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 7px 16px; border-radius: 30px; font-size: 0.78rem; font-weight: 600;
         }
 
-        .acc-active-details { display: flex; align-items: center; gap: 14px; }
-        .acc-active-avatar {
-            width: 46px; height: 46px; border-radius: 12px;
-            background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary));
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900; color: #000; box-shadow: 0 0 15px var(--neon-primary);
+        .status-badge.offline {
+            background: rgba(248, 113, 113, 0.12); color: var(--red);
+            border: 1px solid rgba(248, 113, 113, 0.25);
         }
 
-        .acc-title-row { display: flex; align-items: center; gap: 8px; }
-        .acc-active-title { font-family: 'Orbitron', monospace; font-size: 1.05rem; font-weight: 800; color: #fff; }
-        .btn-edit-nick { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; transition: color 0.2s; }
-        .btn-edit-nick:hover { color: var(--neon-primary); }
-        .acc-active-id { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
-
-        .persona-selector {
-            display: flex; align-items: center; gap: 8px;
-            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px;
+        .status-badge.online {
+            background: rgba(74, 222, 128, 0.12); color: var(--green);
+            border: 1px solid rgba(74, 222, 128, 0.25);
         }
-        .persona-selector label { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; }
-        .persona-selector select {
-            background: transparent; border: none; color: var(--text-main); font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 600; outline: none; cursor: pointer;
+
+        .status-badge.idling {
+            background: rgba(27, 159, 255, 0.12); color: var(--steam-blue);
+            border: 1px solid rgba(27, 159, 255, 0.25);
+            animation: pulseGlow 2s ease-in-out infinite;
         }
-        .persona-selector select option { background: #0f172a; color: #fff; }
 
-        .analytics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
-        .analytics-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 14px; text-align: center; transition: all 0.25s; }
-        .analytics-card:hover { border-color: var(--neon-primary); transform: translateY(-2px); }
-        .analytics-val { font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-primary); }
-        .analytics-lbl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.2px; margin-top: 4px; }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(27, 159, 255, 0); }
+            50% { box-shadow: 0 0 15px rgba(27, 159, 255, 0.25); }
+        }
 
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px; }
-        .form-group input { width: 100%; padding: 13px 16px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); font-size: 0.92rem; outline: none; transition: all 0.25s; }
-        .form-group input:focus { border-color: var(--neon-primary); box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.15); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .offline .status-dot { background: var(--red); }
+        .online .status-dot { background: var(--green); animation: blink 2s infinite; }
+        .idling .status-dot { background: var(--steam-blue); animation: blink 1.2s infinite; }
 
-        .btn { padding: 13px 26px; border: none; border-radius: 10px; font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700; letter-spacing: 1.5px; cursor: pointer; transition: all 0.25s ease; text-transform: uppercase; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
-        .btn-primary { background: linear-gradient(135deg, var(--neon-primary), var(--neon-secondary)); color: #000; font-weight: 800; box-shadow: 0 6px 20px rgba(0, 210, 255, 0.2); }
-        .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.15); box-shadow: 0 8px 25px var(--neon-primary); }
-        .btn-danger { background: rgba(239, 68, 68, 0.12); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3); }
-        .btn-danger:hover { background: rgba(239, 68, 68, 0.25); transform: translateY(-2px); }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        .games-tab-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-        .tabs-list { display: flex; gap: 6px; }
-        .tab-btn { padding: 7px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-family: 'Orbitron', monospace; }
-        .tab-btn.active { background: rgba(0, 210, 255, 0.15); border-color: var(--neon-primary); color: var(--neon-primary); }
+        /* Form elements */
+        .form-group { margin-bottom: 14px; text-align: left; }
 
-        .search-input { padding: 7px 12px; border-radius: 8px; font-size: 0.8rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; width: 180px; }
+        .form-group label {
+            display: block; font-size: 0.8rem; font-weight: 600;
+            color: var(--text2); margin-bottom: 6px;
+        }
 
-        .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; margin-bottom: 16px; }
+        .form-group input {
+            width: 100%; padding: 12px 14px; border-radius: 10px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text); font-size: 0.92rem; font-family: 'Inter', sans-serif;
+            outline: none; transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent); box-shadow: 0 0 0 3px rgba(102, 192, 244, 0.12);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 13px 22px; border: none; border-radius: 10px;
+            font-family: 'Orbitron', monospace; font-size: 0.82rem;
+            font-weight: 700; letter-spacing: 1.5px; cursor: pointer;
+            transition: all 0.25s; text-transform: uppercase;
+            display: inline-flex; align-items: center; gap: 8px;
+            justify-content: center; width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent));
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px); box-shadow: 0 6px 20px rgba(27, 159, 255, 0.35);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+        }
+
+        .btn-danger {
+            background: rgba(248, 113, 113, 0.14); color: var(--red);
+            border: 1px solid rgba(248, 113, 113, 0.35);
+        }
+
+        .btn-danger:hover { background: rgba(248, 113, 113, 0.25); }
+
+        /* Games grid */
+        .games-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px; margin-bottom: 14px;
+        }
+
         .games-grid::-webkit-scrollbar { width: 4px; }
-        .games-grid::-webkit-scrollbar-thumb { background: var(--neon-primary); border-radius: 4px; }
+        .games-grid::-webkit-scrollbar-thumb { background: rgba(102,192,244,0.25); border-radius: 4px; }
 
-        .game-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 11px 13px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: all 0.2s ease; user-select: none; }
-        .game-card:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15); transform: translateY(-2px); }
-        .game-card.selected { background: rgba(0, 210, 255, 0.12); border-color: var(--neon-primary); box-shadow: 0 0 10px rgba(0, 210, 255, 0.15); }
+        .game-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+            cursor: pointer; transition: all 0.2s; user-select: none;
+        }
 
-        .game-checkbox { width: 17px; height: 17px; border-radius: 4px; border: 2px solid rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
-        .game-card.selected .game-checkbox { background: var(--neon-primary); border-color: var(--neon-primary); }
-        .game-card.selected .game-checkbox::after { content: '✓'; color: #000; font-weight: 900; font-size: 10px; }
+        .game-item:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); }
 
-        .game-title { font-size: 0.8rem; font-weight: 500; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-        .game-appid { font-size: 0.65rem; color: var(--text-muted); font-family: 'Orbitron', monospace; }
+        .game-item.selected {
+            background: rgba(27, 159, 255, 0.12); border-color: var(--steam-blue);
+        }
 
-        .custom-app-row { display: flex; gap: 10px; margin-top: 12px; }
-        .custom-app-row input { flex: 1; padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); font-size: 0.82rem; outline: none; }
-        .custom-app-row button { padding: 9px 18px; border-radius: 8px; border: none; background: rgba(0, 210, 255, 0.15); color: var(--neon-primary); font-family: 'Orbitron', monospace; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-        .custom-app-row button:hover { background: rgba(0, 210, 255, 0.3); transform: scale(1.03); }
+        .game-check {
+            width: 18px; height: 18px; border-radius: 5px;
+            border: 2px solid rgba(255,255,255,0.2); display: flex;
+            align-items: center; justify-content: center; font-size: 11px;
+            flex-shrink: 0; transition: all 0.2s;
+        }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .modal-overlay.active { display: flex; animation: fadeIn 0.25s ease; }
-        .modal-content { background: var(--sidebar-bg); border: 1px solid var(--card-border); border-radius: 20px; width: 100%; max-width: 540px; padding: 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .game-item.selected .game-check {
+            background: var(--steam-blue); border-color: var(--steam-blue); color: #fff;
+        }
 
-        .leader-item { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; }
-        .leader-rank { font-family: 'Orbitron', monospace; font-size: 1.2rem; font-weight: 900; width: 32px; text-align: center; }
-        .rank-1 { color: #f59e0b; text-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
-        .rank-2 { color: #94a3b8; }
-        .rank-3 { color: #b45309; }
+        .game-item.selected .game-check::after { content: '✓'; }
 
-        .leader-info { flex: 1; }
-        .leader-name { font-family: 'Orbitron', monospace; font-size: 0.88rem; font-weight: 700; color: #fff; }
-        .leader-hours { font-size: 0.8rem; color: var(--neon-primary); font-weight: 600; margin-top: 2px; }
+        .game-label { font-size: 0.82rem; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .game-id { font-size: 0.7rem; color: var(--text2); font-family: 'Orbitron', monospace; }
 
-        .error-msg { padding: 12px 16px; border-radius: 10px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--red); font-size: 0.82rem; margin-bottom: 14px; }
-        .warn-msg { padding: 12px 16px; border-radius: 10px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); color: var(--orange); font-size: 0.8rem; line-height: 1.5; margin-bottom: 16px; }
+        /* Custom App ID input */
+        .custom-appid {
+            display: flex; gap: 8px; margin-top: 10px;
+        }
 
-        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+        .custom-appid input {
+            flex: 1; padding: 10px 14px; border-radius: 8px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text); font-size: 0.85rem; outline: none;
+        }
+
+        .custom-appid button {
+            padding: 10px 16px; border-radius: 8px; border: none;
+            background: rgba(102, 192, 244, 0.15); color: var(--accent);
+            font-family: 'Orbitron', monospace; font-size: 0.75rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s;
+        }
+
+        .custom-appid button:hover { background: var(--accent); color: #000; }
+
+        /* Stats Row */
+        .stats-row {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px;
+        }
+
+        .stat-box {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px; padding: 14px 10px; text-align: center;
+        }
+
+        .stat-val {
+            font-family: 'Orbitron', monospace; font-size: 1.25rem; font-weight: 700;
+            color: var(--accent); margin-bottom: 4px;
+        }
+
+        .stat-lbl { font-size: 0.72rem; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Active games tag */
+        .active-games { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+        .active-game-tag {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+            background: rgba(27, 159, 255, 0.12); color: var(--steam-blue);
+            border: 1px solid rgba(27, 159, 255, 0.25);
+        }
+
+        .active-game-tag .tag-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: var(--steam-blue);
+            animation: blink 1.5s infinite;
+        }
+
+        /* Error box */
+        .error-box {
+            background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3);
+            color: var(--red); border-radius: 10px; padding: 12px; font-size: 0.82rem;
+            margin-bottom: 14px; text-align: left;
+        }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3); border-radius: 50%;
+            border-top-color: #fff; animation: spin 0.8s linear infinite;
+        }
+
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .view-section { display: none; }
-        .view-section.active { display: block; }
+        .section { display: none; }
+        .section.active { display: block; }
 
-        .login-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
-
-        @media (max-width: 850px) {
-            .app-wrapper { flex-direction: column; }
-            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--card-border); padding: 18px; }
-            .main-content { padding: 20px 14px; }
-            .analytics-grid { grid-template-columns: repeat(2, 1fr); }
-            .login-grid { grid-template-columns: 1fr; }
+        .footer {
+            text-align: center; color: rgba(148, 163, 184, 0.4);
+            font-size: 0.72rem; margin-top: 30px; font-family: 'Orbitron', monospace;
         }
     </style>
 </head>
-<body class="theme-cyber">
+<body>
     <div class="bg-grid"></div>
-    <div class="bg-glow-1"></div>
-    <div class="bg-glow-2"></div>
+    <div class="bg-glow"></div>
 
-    <div class="app-wrapper">
-        <!-- SIDEBAR -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">🎮</div>
-                <div class="brand-text">
-                    <h1>STEAM IDLE</h1>
-                    <p>Oyun Saati Kasma</p>
-                </div>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo-row">
+                <div class="logo-icon">🎮</div>
+                <h1>STEAM IDLE PRO</h1>
             </div>
+            <p>Çoklu Hesap • Steam Mobil QR Kod Girişi • 7/24 Kesintisiz Saat Kasma</p>
+        </div>
 
-            <!-- MASTER CONTROL BOX (Sadece Hesap Eklenince Görünür) -->
-            <div class="master-box" id="masterBox" style="display: none;">
-                <div class="master-title">
-                    <span>⚡ TOPLU KONTROL (MASTER)</span>
-                </div>
-                <div class="master-btns">
-                    <button class="btn-master btn-master-start" onclick="masterStartIdleAll()" title="Tüm hesaplarda aynı anda CS2 kas">
-                        🚀 HEPSİNİ IDLE ET
-                    </button>
-                    <button class="btn-master btn-master-stop" onclick="masterStopIdleAll()" title="Tüm hesaplarda durdur">
-                        ⏹ HEPSİNİ DURDUR
-                    </button>
-                </div>
+        <!-- MASTER CONTROLS BAR (Hesaplar varsa görünür) -->
+        <div class="master-bar" id="masterBar" style="display: none;">
+            <div class="master-title">
+                <span>⚡</span> TOPLU HESAP YÖNETİMİ
             </div>
-
-            <div class="accounts-header">
-                <span>HESAPLARIN</span>
-                <button class="btn-add-account" onclick="showAddAccountView()" title="Yeni Hesap Ekle">+</button>
-            </div>
-
-            <div class="accounts-list" id="sidebarAccountsList">
-                <!-- Hesap kartları -->
-            </div>
-        </aside>
-
-        <!-- MAIN CONTENT AREA -->
-        <main class="main-content">
-            <!-- TOP NAVBAR -->
-            <div class="top-navbar">
-                <div class="theme-selector" title="Renk Teması Seç">
-                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; padding: 0 4px;">TEMA:</span>
-                    <div class="theme-pill pill-cyber active" onclick="setTheme('theme-cyber')" title="Neon Cyber"></div>
-                    <div class="theme-pill pill-cyberpunk" onclick="setTheme('theme-cyberpunk')" title="Cyberpunk 2077"></div>
-                    <div class="theme-pill pill-crimson" onclick="setTheme('theme-crimson')" title="Crimson Red"></div>
-                    <div class="theme-pill pill-synthwave" onclick="setTheme('theme-synthwave')" title="Synthwave Violet"></div>
-                    <div class="theme-pill pill-matrix" onclick="setTheme('theme-matrix')" title="Matrix Green"></div>
-                </div>
-
-                <button class="btn-leaderboard" onclick="openLeaderboardModal()">
-                    <span>🏆</span> LİDERLİK TABLOSU (#1 KİM?)
+            <div class="master-btns">
+                <button class="btn-master btn-master-start" onclick="masterStartIdleAll()">
+                    ▶ TÜMÜNÜ BAŞLAT
+                </button>
+                <button class="btn-master btn-master-stop" onclick="masterStopIdleAll()">
+                    ⏹ TÜMÜNÜ DURDUR
                 </button>
             </div>
+        </div>
 
-            <!-- VIEW 1: LOGIN WITH PASSWORD OR QR CODE (DUAL VIEW - BOTH VISIBLE AT ONCE) -->
-            <div class="view-section active" id="addAccountView">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">🔐 Yeni Steam Hesabı Ekle</div>
+        <!-- ACCOUNTS TABS BAR -->
+        <div class="accounts-bar" id="accountsBar"></div>
+
+        <!-- SECTION 1: LOGIN (DUAL: QR LEFT + PASS RIGHT) -->
+        <div class="section active" id="loginSection">
+            <div class="card">
+                <div class="card-title">🔐 Steam Girişi Yap (Hesap Ekle)</div>
+
+                <div class="login-dual-grid">
+                    <!-- LEFT COLUMN: STEAM MOBILE QR CODE -->
+                    <div class="login-sub-box">
+                        <div style="font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700; color: var(--accent); margin-bottom: 6px;">
+                            📱 STEAM MOBİL QR İLE GİRİŞ
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text2); margin-bottom: 12px;">
+                            En güvenli & en hızlı yöntem! Şifre yazmadan anında bağlan.
+                        </p>
+
+                        <div class="qr-box" id="qrBox">
+                            <div class="qr-scan-line"></div>
+                            <span class="spinner" style="width: 30px; height: 30px;"></span>
+                        </div>
+
+                        <div id="qrStatusMsg" style="font-size: 0.78rem; color: var(--text2); margin-top: 10px;">
+                            QR Kod Yükleniyor...
+                        </div>
+
+                        <div style="font-size: 0.72rem; color: var(--text2); margin-top: 10px; line-height: 1.4; text-align: left; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                            1. Telefonunda <strong>Steam Mobil</strong> uygulamasını aç.<br>
+                            2. <strong>Steam Guard</strong> simgesine dokun.<br>
+                            3. <strong>QR Kodu Tara</strong> diyerek kodu okut!
+                        </div>
                     </div>
 
-                    <div class="login-grid">
-                        <!-- LEFT COLUMN: QR CODE LOGIN -->
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); border-radius: 16px; padding: 20px; text-align: center;">
-                            <div style="font-family: 'Orbitron', monospace; font-size: 0.85rem; font-weight: 800; color: var(--neon-primary); margin-bottom: 14px; text-transform: uppercase;">
-                                📱 1. YÖNTEM: QR KOD İLE GİRİŞ
-                            </div>
+                    <!-- RIGHT COLUMN: USERNAME & PASSWORD -->
+                    <div class="login-sub-box">
+                        <div style="font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700; color: var(--accent); margin-bottom: 6px;">
+                            🔑 ŞİFRE İLE MANUEL GİRİŞ
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text2); margin-bottom: 12px;">
+                            Geleneksel kullanıcı adı & şifre ile giriş yap:
+                        </p>
 
-                            <div class="qr-container" style="padding: 16px; margin-bottom: 12px;">
-                                <div class="qr-img-box" id="qrBox" style="min-width: 200px; min-height: 200px; width: 200px; height: 200px; margin: 0 auto 12px auto;">
-                                    <div class="qr-scan-line"></div>
-                                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
-                                        <span class="spinner" style="width: 32px; height: 32px; border-width: 3px;"></span>
-                                        <span style="font-size: 0.75rem; color: var(--neon-primary); font-weight: 600;">QR Kod Yükleniyor...</span>
-                                    </div>
-                                </div>
+                        <div id="loginError"></div>
 
-                                <div id="qrStatusMsg" style="text-align: center;">
-                                    <div style="font-size: 0.82rem; font-weight: 700; color: var(--neon-primary);">
-                                        📱 Steam Uygulamasından QR Kodunu Okutun!
-                                    </div>
-                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
-                                        ⏱️ Yenileniyor: <strong style="color: var(--gold);" id="qrTimerVal">60s</strong>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; text-align: left;">
-                                1. Telefonunuzdan <strong>Steam Uygulamasını</strong> açın.<br>
-                                2. <strong>Steam Guard (Kalkan)</strong> simgesine dokunun.<br>
-                                3. <strong>QR Kodu Tara</strong> diyerek yukarıdaki kodu okutun!
-                            </div>
+                        <div class="form-group">
+                            <label>Steam Kullanıcı Adı</label>
+                            <input type="text" id="username" placeholder="Kullanıcı adı gir..." autocomplete="off">
                         </div>
 
-                        <!-- RIGHT COLUMN: MANUAL USERNAME & PASSWORD LOGIN -->
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 20px;">
-                            <div style="font-family: 'Orbitron', monospace; font-size: 0.85rem; font-weight: 800; color: var(--neon-primary); margin-bottom: 14px; text-transform: uppercase;">
-                                🔑 2. YÖNTEM: ŞİFRE İLE MANUEL GİRİŞ
-                            </div>
-
-                            <div class="warn-msg" style="font-size: 0.78rem; margin-bottom: 14px; padding: 10px;">
-                                ⚡ Bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
-                            </div>
-
-                            <div id="loginErrorMsg"></div>
-
-                            <div class="form-group">
-                                <label>Steam Kullanıcı Adı</label>
-                                <input type="text" id="loginUsername" placeholder="Kullanıcı adını gir..." autocomplete="off">
-                            </div>
-
-                            <div class="form-group">
-                                <label>Şifre</label>
-                                <input type="password" id="loginPassword" placeholder="Şifreni gir...">
-                            </div>
-
-                            <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()" style="margin-top: 10px;">
-                                GİRİŞ YAP VE HESABI EKLE
-                            </button>
+                        <div class="form-group">
+                            <label>Şifre</label>
+                            <input type="password" id="password" placeholder="Şifreni gir...">
                         </div>
+
+                        <button class="btn btn-primary" id="loginBtn" onclick="doLogin()" style="margin-top: 14px;">
+                            GİRİŞ YAP
+                        </button>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- VIEW 2: STEAM GUARD INPUT -->
-            <div class="view-section" id="steamGuardView">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">🛡️ Steam Guard Kodu Gerekli</div>
-                    </div>
+        <!-- SECTION 2: STEAM GUARD INPUT -->
+        <div class="section" id="guardSection">
+            <div class="card">
+                <div class="card-title">🛡️ Steam Guard Kodu Gerekli</div>
 
-                    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 16px;" id="steamGuardPrompt">
-                        Lütfen mobil uygulamanızdaki veya e-postanızdaki 5 haneli Steam Guard kodunu girin.
-                    </p>
+                <p style="color: var(--text2); margin-bottom: 16px; font-size: 0.88rem;" id="guardPrompt">
+                    5 haneli Steam Guard onay kodunu girin.
+                </p>
 
-                    <div id="guardErrorMsg"></div>
+                <div id="guardError"></div>
 
-                    <div class="form-group">
-                        <label>Steam Guard Kodu</label>
-                        <input type="text" id="guardCode" placeholder="XXXXX" maxlength="5"
-                               style="font-family: 'Orbitron', monospace; font-size: 1.6rem; text-align: center; letter-spacing: 8px; text-transform: uppercase;">
-                    </div>
+                <div class="form-group" style="max-width: 300px; margin: 0 auto 16px auto;">
+                    <input type="text" id="guardCode" placeholder="XXXXX" maxlength="5"
+                           style="font-family: 'Orbitron', monospace; font-size: 1.6rem; text-align: center; letter-spacing: 8px; text-transform: uppercase;">
+                </div>
 
-                    <button class="btn btn-primary" id="btnGuard" onclick="submitSteamGuard()">
+                <div style="display: flex; gap: 10px; max-width: 400px; margin: 0 auto;">
+                    <button class="btn btn-primary" id="guardBtn" onclick="doSteamGuard()">
                         KODU DOĞRULA
                     </button>
-                    <button class="btn btn-danger" onclick="showAddAccountView()" style="margin-top: 12px;">
-                        ⬅️ GERİ DÖN / QR KOD İLE VEYA FARKLI HESAPLA GİRİŞ YAP
+                    <button class="btn btn-danger" onclick="showAddAccountScreen()">
+                        İPTAL
                     </button>
                 </div>
             </div>
+        </div>
 
-            <!-- VIEW 3: ACTIVE ACCOUNT CONTROL PANEL -->
-            <div class="view-section" id="accountDashboardView">
-                <!-- Account Header Bar -->
-                <div class="account-header-bar">
-                    <div class="acc-active-details">
-                        <div class="acc-active-avatar" id="dashAvatar">?</div>
-                        <div>
-                            <div class="acc-title-row">
-                                <span class="acc-active-title" id="dashPersona">Yukleniyor...</span>
-                                <button class="btn-edit-nick" onclick="editCustomNickname()" title="Özel Takma Ad Ver">✏️</button>
+        <!-- SECTION 3: DASHBOARD (SELECTED ACCOUNT) -->
+        <div class="section" id="dashSection">
+            <div class="card">
+                <div class="card-title">📊 Hesap Paneli</div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+                    <div>
+                        <span style="color: var(--text2); font-size: 0.78rem;">Aktif Hesap:</span>
+                        <div id="displayName" style="font-family: 'Orbitron', monospace; font-size: 1.15rem; font-weight: 700; color: var(--accent);">--</div>
+                    </div>
+                    <div>
+                        <span class="status-badge online" id="statusBadge">
+                            <span class="status-dot"></span>
+                            <span id="statusText">Çevrimiçi</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <div class="stat-val" id="uptimeDisplay">00:00:00</div>
+                        <div class="stat-lbl" id="uptimeLabel">İdle Süresi</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" id="gameCount">0</div>
+                        <div class="stat-lbl">Aktif Oyun</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" id="statusLabel">Bekliyor</div>
+                        <div class="stat-lbl">Durum</div>
+                    </div>
+                </div>
+
+                <!-- CANLI STEAM DOĞRULAMA & BİLGİLENDİRME KUTUSU -->
+                <div id="steamLiveBox" style="margin-top: 14px; padding: 14px 18px; border-radius: 12px; background: rgba(27, 159, 255, 0.06); border: 1px solid rgba(102, 192, 244, 0.25);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span id="liveDot" style="font-size: 1.2rem;">🔵</span>
+                            <div>
+                                <div style="font-size: 0.88rem; font-weight: 700; color: var(--accent);" id="liveTitle">Steam Durumu: Hazır</div>
+                                <div style="font-size: 0.78rem; color: var(--text2);" id="liveSubTitle">Oyunu başlatmak için aşağıdaki "IDLE BAŞLAT" butonuna bas.</div>
                             </div>
-                            <div class="acc-active-id" id="dashSteamID">SteamID: --</div>
                         </div>
+                        <a id="steamProfileLink" href="#" target="_blank" style="display: none; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; background: linear-gradient(135deg, var(--steam-blue), var(--accent)); color: #fff; font-size: 0.75rem; font-weight: 700; text-decoration: none; box-shadow: 0 0 12px rgba(27,159,255,0.3); transition: all 0.2s;">
+                            <span>🌐 Steam Profilini Aç (Canlı Gör) ↗</span>
+                        </a>
                     </div>
-
-                    <!-- PERSONA STATE SELECTOR -->
-                    <div class="persona-selector" title="Steam Profil Durumu">
-                        <label>GÖRÜNÜM:</label>
-                        <select id="dashPersonaSelect" onchange="changePersonaState(this.value)">
-                            <option value="1">🟢 Çevrimiçi (Online)</option>
-                            <option value="7">🥷 Görünmez (Invisible - Gizli Kas)</option>
-                            <option value="3">🌙 Dışarıda (Away)</option>
-                            <option value="4">⛔ Meşgul (Busy)</option>
-                        </select>
+                    <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.08); font-size: 0.75rem; color: #94a3b8; line-height: 1.5;">
+                        ⚡ <strong>Steam Saat Mantığı:</strong> Steam profilindeki toplam saat sayacı saniye saniye değil, yaklaşık <strong>her 20-30 dakikada bir</strong> Steam sunucuları tarafından toplu artırılır. Profil linkine tıkladığında yeşil renkte <em>"Şu Anda Oyunda: Counter-Strike 2"</em> yazıyorsa saatlerin Steam tarafından sorunsuz sayılıyor demektir!
                     </div>
                 </div>
 
-                <!-- TIME ANALYTICS GRID -->
-                <div class="analytics-grid">
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="analyticsToday">0s 0dk</div>
-                        <div class="analytics-lbl">Bugün Kasdı</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="analyticsWeek">0.0 Sa</div>
-                        <div class="analytics-lbl">Bu Hafta</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="analyticsMonth">0.0 Sa</div>
-                        <div class="analytics-lbl">Bu Ay</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="analyticsTotal">0 Sa</div>
-                        <div class="analytics-lbl">Toplam Kasdı</div>
-                    </div>
-                </div>
+                <div class="active-games" id="activeGames"></div>
+            </div>
 
-                <!-- Games Selection Card -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">🕹️ Saat Kasılacak Oyunları Seç</div>
-                    </div>
+            <!-- Game Selection Card -->
+            <div class="card">
+                <div class="card-title">🕹️ Oyun Seç (Bu Hesap İçin)</div>
 
-                    <div class="games-tab-bar">
-                        <div class="tabs-list">
-                            <button class="tab-btn active" id="tabOwned" onclick="switchGameTab('owned')">
-                                Hesaptaki Oyunlar (<span id="countOwnedTab">0</span>)
-                            </button>
-                            <button class="tab-btn" id="tabPopular" onclick="switchGameTab('popular')">
-                                Popüler Oyunlar
-                            </button>
-                        </div>
-                        <input type="text" class="search-input" id="gameSearchInput" placeholder="Oyun ara..." oninput="renderGamesList()">
-                    </div>
-
-                    <div class="games-grid" id="gamesContainer">
-                        <!-- Oyun kartları -->
-                    </div>
-
-                    <div class="custom-app-row">
-                        <input type="number" id="customAppIdInput" placeholder="Özel Steam App ID gir (Örn: 730)">
-                        <button onclick="addCustomAppId()">+ Ekle</button>
-                    </div>
-                </div>
-
-                <!-- Action Controls -->
-                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                    <button class="btn btn-primary" style="flex: 2; min-width: 200px;" id="btnIdleControl" onclick="toggleIdle()">
-                        ▶ IDLE BAŞLAT
-                    </button>
-                    <button class="btn btn-danger" style="flex: 1; min-width: 130px;" onclick="logoutAccount()">
-                        🚪 HESABI KALDIR
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <input type="text" id="gameSearch" placeholder="🔍 Oyun ara (İsim veya App ID)..." oninput="renderGames(this.value)"
+                           style="flex: 1; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text); font-size: 0.85rem; outline: none;">
+                    <button onclick="clearSelectedGames()" style="padding: 10px 14px; border-radius: 8px; border: none; background: rgba(248,113,113,0.15); color: var(--red); font-size: 0.75rem; font-weight: 600; cursor: pointer;">
+                        ✕ Seçimi Temizle
                     </button>
                 </div>
-            </div>
-        </main>
-    </div>
 
-    <!-- LEADERBOARD MODAL -->
-    <div class="modal-overlay" id="leaderboardModal">
-        <div class="modal-content">
-            <div class="card-header" style="margin-bottom: 16px;">
-                <div class="card-title">🏆 EN ÇOK SAAT KASANLAR (#1 KİM?)</div>
-                <button style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer;" onclick="closeLeaderboardModal()">✕</button>
+                <div class="games-grid" id="gamesGrid"></div>
+
+                <div class="custom-appid">
+                    <input type="number" id="customAppId" placeholder="Özel Steam App ID gir (Örn: 730)">
+                    <button onclick="addCustomAppId()">+ Ekle</button>
+                </div>
             </div>
-            <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom: 16px;">
-                Eklemiş olduğun hesapların toplam idle sürelerine göre canlı sıralaması:
-            </p>
-            <div id="leaderboardList">
-                <!-- Liderlik listesi -->
+
+            <!-- Controls -->
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="btn btn-primary" style="flex: 2; min-width: 200px;" id="idleBtn" onclick="toggleActiveAccountIdle()">
+                    ▶ IDLE BAŞLAT
+                </button>
+                <button class="btn btn-danger" style="flex: 1; min-width: 140px;" onclick="doLogoutAccount()">
+                    🚪 HESABI KALDIR
+                </button>
             </div>
+        </div>
+
+        <div class="footer">
+            Steam Idle Pro • Çoklu Hesap & QR Giriş • Bilgilerin Güvende
         </div>
     </div>
 
     <script>
         // ============================================================
-        // GLOBAL STATE & SESSION MANAGEMENT
+        // GLOBAL STATE
         // ============================================================
-        function getSessionId() {
-            let sid = localStorage.getItem('steam_idle_sid');
-            if (!sid) {
-                sid = 'sid_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-                localStorage.setItem('steam_idle_sid', sid);
-            }
-            return sid;
-        }
-
-        const sessionId = getSessionId();
         let accountsList = [];
-        let leaderboardData = [];
         let activeUsername = null;
-        let activeAccountData = null;
-        let selectedAppIds = new Set();
-        let currentTab = 'owned';
-        let popularGames = [];
-        let pollingInterval = null;
+        let selectedAppIds = new Set([730]); // Counter-Strike 2 varsayılan olarak seçili
+        let allGames = [];
+        let statusInterval = null;
 
-        // QR Code Session & 60s Countdown State
+        // QR Code state
+        let currentQrSessionId = null;
         let qrPollingInterval = null;
         let qrCountdownInterval = null;
         let qrCountdownSec = 60;
-        let currentQrSessionId = null;
 
-        const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5000' : '';
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
 
-        async function apiFetch(url, options = {}) {
-            options.headers = options.headers || {};
-            options.headers['x-session-id'] = sessionId;
-            options.headers['Content-Type'] = 'application/json';
-
-            let base = API_BASE;
-            if (window.location.protocol && window.location.protocol.startsWith('http')) {
-                base = window.location.origin;
-            }
-            const targetUrl = url.startsWith('http') ? url : (base + url);
-
-            try {
-                const res = await fetch(targetUrl, options);
-                return await res.json();
-            } catch (e) {
-                console.error('API Fetch Hatası:', e);
-                return { success: false, error: 'Sunucuya bağlanılamadı. Lütfen sunucunun açık olduğundan ve http://localhost:5000 adresini açtığınızdan emin olun.' };
-            }
+        function formatUptime(seconds) {
+            const sNum = parseInt(seconds) || 0;
+            const h = Math.floor(sNum / 3600);
+            const m = Math.floor((sNum % 3600) / 60);
+            const s = sNum % 60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
         }
 
         // ============================================================
-        // THEME SWITCHER
+        // QR CODE LOGIN FLOW
         // ============================================================
-        function setTheme(themeName) {
-            document.body.className = themeName;
-            try { localStorage.setItem('steam_idle_theme', themeName); } catch (e) {}
-            document.querySelectorAll('.theme-pill').forEach(p => p.classList.remove('active'));
-            const map = {
-                'theme-cyber': '.pill-cyber',
-                'theme-cyberpunk': '.pill-cyberpunk',
-                'theme-crimson': '.pill-crimson',
-                'theme-synthwave': '.pill-synthwave',
-                'theme-matrix': '.pill-matrix'
-            };
-            const selector = map[themeName];
-            if (selector) {
-                const el = document.querySelector(selector);
-                if (el) el.classList.add('active');
-            }
-        }
-
-        const savedTheme = localStorage.getItem('steam_idle_theme') || 'theme-cyber';
-
-        // ============================================================
-        // LOGIN MODE SWITCHER & 60s QR AUTO REFRESH
-        // ============================================================
-        let currentLoginMode = 'qr';
-
-        function switchLoginMode(mode) {
-            currentLoginMode = mode;
-            if (qrPollingInterval) clearInterval(qrPollingInterval);
-            if (qrCountdownInterval) clearInterval(qrCountdownInterval);
-
-            showView('addAccountView');
-
-            const passBtn = document.getElementById('loginTabPass');
-            const qrBtn = document.getElementById('loginTabQR');
-            const passMode = document.getElementById('loginPassMode');
-            const qrMode = document.getElementById('loginQRMode');
-
-            if (mode === 'password') {
-                if (passBtn) passBtn.className = 'login-tab-btn active';
-                if (qrBtn) qrBtn.className = 'login-tab-btn';
-                if (passMode) passMode.style.display = 'block';
-                if (qrMode) qrMode.style.display = 'none';
-            } else {
-                if (passBtn) passBtn.className = 'login-tab-btn';
-                if (qrBtn) qrBtn.className = 'login-tab-btn active';
-                if (passMode) passMode.style.display = 'none';
-                if (qrMode) qrMode.style.display = 'block';
-                startQrLoginFlow();
-            }
-        }
-
-        async function startQrLoginFlow() {
+        async function startQrLogin() {
             if (qrPollingInterval) clearInterval(qrPollingInterval);
             if (qrCountdownInterval) clearInterval(qrCountdownInterval);
 
             const qrBox = document.getElementById('qrBox');
-            const qrTimerVal = document.getElementById('qrTimerVal');
             const qrStatusMsg = document.getElementById('qrStatusMsg');
 
             if (qrBox) {
-                qrBox.innerHTML = '<div class="qr-scan-line"></div><span class="spinner" style="width: 32px; height: 32px;"></span>';
+                qrBox.innerHTML = '<div class="qr-scan-line"></div><span class="spinner" style="width: 30px; height: 30px;"></span>';
             }
-            if (qrTimerVal) qrTimerVal.textContent = '60s';
             if (qrStatusMsg) {
-                qrStatusMsg.innerHTML = `
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--neon-primary);">
-                        📱 Steam Mobil Uygulamasından QR Kodunu Okutun!
-                    </div>
-                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
-                        ⏱️ QR Kod Yenileniyor: <strong style="color: var(--gold);" id="qrTimerVal">60s</strong>
-                    </div>
-                `;
+                qrStatusMsg.innerHTML = '⏱️ Yenileniyor: <strong id="qrTimerVal" style="color: var(--orange);">60s</strong>';
             }
 
             try {
-                const data = await apiFetch('/api/account/qr-start', { method: 'POST' });
+                const res = await fetch('/api/qr-start', { method: 'POST' });
+                const data = await res.json();
+
                 if (data.success) {
                     currentQrSessionId = data.qrSessionId;
                     if (qrBox) {
-                        qrBox.innerHTML = `
-                            <div class="qr-scan-line"></div>
-                            <img src="${data.qrDataUrl}" alt="Steam QR Login">
-                        `;
+                        qrBox.innerHTML = `<div class="qr-scan-line"></div><img src="${data.qrDataUrl}" alt="Steam QR Login">`;
                     }
 
-                    // 60 Saniye Canlı Geri Sayım & Otomatik Yenileme
                     qrCountdownSec = 60;
-                    const timerElem = document.getElementById('qrTimerVal');
-                    if (timerElem) timerElem.textContent = `${qrCountdownSec}s`;
-
                     qrCountdownInterval = setInterval(() => {
                         qrCountdownSec--;
-                        const curTimerElem = document.getElementById('qrTimerVal');
-                        if (curTimerElem) curTimerElem.textContent = `${qrCountdownSec}s`;
-
+                        const t = document.getElementById('qrTimerVal');
+                        if (t) t.textContent = `${qrCountdownSec}s`;
                         if (qrCountdownSec <= 0) {
                             clearInterval(qrCountdownInterval);
                             clearInterval(qrPollingInterval);
-                            startQrLoginFlow(); // 60 saniyede bir otomatik taze QR kod oluştur!
+                            startQrLogin();
                         }
                     }, 1000);
 
-                    // QR Kod Tarama Durumu Sorgulayıcı (Polling)
                     qrPollingInterval = setInterval(async () => {
                         try {
-                            const res = await apiFetch(`/api/account/qr-status?qrSessionId=${currentQrSessionId}`);
-                            if (res.authenticated) {
+                            const check = await fetch(`/api/qr-status?qrSessionId=${currentQrSessionId}`);
+                            const cData = await check.json();
+                            if (cData.authenticated) {
                                 clearInterval(qrPollingInterval);
                                 clearInterval(qrCountdownInterval);
-                                const statusElem = document.getElementById('qrStatusMsg');
-                                if (statusElem) {
-                                    statusElem.innerHTML = `
-                                        <div style="font-size: 1rem; font-weight: 800; color: var(--green);">
-                                            ✅ QR KOD BAŞARIYLA TARANDI! GİRİŞ YAPILIYOR...
-                                        </div>
-                                    `;
+                                if (qrStatusMsg) {
+                                    qrStatusMsg.innerHTML = '<span style="color: var(--green); font-weight: 700;">✅ QR Başarıyla Tarandı!</span>';
                                 }
-                                activeUsername = res.username;
-                                setTimeout(() => { loadAccounts(); }, 800);
-                            } else if (res.error) {
-                                clearInterval(qrPollingInterval);
-                                clearInterval(qrCountdownInterval);
-                                const statusElem = document.getElementById('qrStatusMsg');
-                                if (statusElem) {
-                                    statusElem.innerHTML = `
-                                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--red);">
-                                            ❌ ${res.error}
-                                        </div>
-                                        <button onclick="startQrLoginFlow()" class="btn-master btn-master-start" style="margin: 10px auto; width: auto; padding: 6px 16px;">
-                                            🔄 Yeniden QR Kod Oluştur
-                                        </button>
-                                    `;
-                                }
+                                await loadAccounts(cData.username);
                             }
                         } catch (e) {}
                     }, 1500);
-                } else {
-                    if (qrStatusMsg) {
-                        qrStatusMsg.innerHTML = `<div style="color: var(--red);">❌ QR Kod oluşturulamadı: ${data.error}</div>`;
-                    }
                 }
             } catch (e) {
-                if (qrStatusMsg) {
-                    qrStatusMsg.innerHTML = '<div style="color: var(--red);">❌ Sunucu bağlantı hatası.</div>';
-                }
+                if (qrStatusMsg) qrStatusMsg.textContent = 'QR oluşturulamadı.';
             }
         }
 
         // ============================================================
-        // VIEW SWITCHER
+        // USERNAME & PASSWORD LOGIN
         // ============================================================
-        function showView(viewId) {
-            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
-        }
-
-        function showAddAccountView(preserveError = false) {
-            activeUsername = null;
-            renderSidebar();
-            showView('addAccountView');
-            startQrLoginFlow();
-            if (!preserveError) {
-                const errDiv = document.getElementById('loginErrorMsg');
-                if (errDiv) errDiv.innerHTML = '';
-            }
-        }
-
-        function showQrAddAccountView() {
-            showAddAccountView();
-        }
-
-        // ============================================================
-        // SIDEBAR & ACCOUNTS LOADING
-        // ============================================================
-        async function loadAccounts() {
-            try {
-                const data = await apiFetch('/api/session/accounts');
-                if (data.success) {
-                    accountsList = data.accounts || [];
-                    leaderboardData = data.leaderboard || [];
-                    renderSidebar();
-
-                    if (accountsList.length > 0) {
-                        if (!activeUsername || !accountsList.find(a => a.username === activeUsername)) {
-                            selectAccount(accountsList[0].username);
-                        } else {
-                            selectAccount(activeUsername);
-                        }
-                    } else {
-                        const isAddViewActive = document.getElementById('addAccountView').classList.contains('active');
-                        showAddAccountView(isAddViewActive);
-                    }
-                }
-            } catch (e) {
-                console.error('Hesaplar yüklenirken hata:', e);
-            }
-        }
-
-        function renderSidebar() {
-            const masterBox = document.getElementById('masterBox');
-            if (masterBox) {
-                masterBox.style.display = accountsList.length > 0 ? 'block' : 'none';
-            }
-
-            const container = document.getElementById('sidebarAccountsList');
-            container.innerHTML = '';
-
-            accountsList.forEach(acc => {
-                const card = document.createElement('div');
-                const isSelected = acc.username === activeUsername;
-                card.className = 'account-card' + (isSelected ? ' active' : '');
-                card.onclick = () => selectAccount(acc.username);
-
-                let statusDotClass = 'offline';
-                let subText = 'Çevrimdışı';
-
-                if (acc.isIdling) {
-                    statusDotClass = 'idling';
-                    subText = `🎮 ${acc.activeGamesCount} oyun kasılıyor`;
-                } else if (acc.loggedIn) {
-                    statusDotClass = acc.personaState == 7 ? 'invisible' : 'online';
-                    subText = acc.personaState == 7 ? '🥷 Gizli Mod' : 'Çevrimiçi';
-                } else if (acc.steamGuardNeeded) {
-                    statusDotClass = 'guard';
-                    subText = '🔐 Guard Bekliyor';
-                }
-
-                const displayName = acc.nickname ? `${acc.nickname} (${acc.persona || acc.username})` : (acc.persona || acc.username);
-
-                card.innerHTML = `
-                    <div class="acc-avatar">
-                        ${displayName.charAt(0).toUpperCase()}
-                        <div class="acc-status-dot ${statusDotClass}"></div>
-                    </div>
-                    <div class="acc-info">
-                        <div class="acc-name">${displayName}</div>
-                        <div class="acc-sub">${subText}</div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-
-            // Alt tarafa belirgin YENİ HESAP EKLE butonu
-            const addBtn = document.createElement('button');
-            addBtn.className = 'btn-add-full';
-            addBtn.onclick = () => showAddAccountView();
-            addBtn.innerHTML = '➕ YENİ HESAP EKLE';
-            container.appendChild(addBtn);
-        }
-
-        async function selectAccount(username) {
-            activeUsername = username;
-            renderSidebar();
-
-            try {
-                const data = await apiFetch(`/api/account/status?username=${encodeURIComponent(username)}`);
-                if (data.success) {
-                    activeAccountData = data;
-                    if (data.steamGuardNeeded) {
-                        showView('steamGuardView');
-                        const promptEl = document.getElementById('steamGuardPrompt');
-                        if (data.steamGuardType === 'email') {
-                            promptEl.innerHTML = `📧 <strong>[${username}]</strong> Hesabında E-Posta Kalkanı aktif! E-postana gönderilen 5 haneli Steam Guard kodunu girin.`;
-                        } else {
-                            promptEl.innerHTML = `📱 <strong>[${username}]</strong> Hesabında <u>Steam Mobil Kalkanı (Authenticator)</u> aktif!<br><span style="color: var(--gold); font-weight: 700;">⚠️ E-postaya kod gelmez!</span> Telefonundaki <strong>Steam Uygulamasını</strong> açıp <strong>Steam Guard (Kalkan 🛡️)</strong> sekmesindeki 5 haneli kodu girin.`;
-                        }
-                    } else if (data.loggedIn) {
-                        showView('accountDashboardView');
-                        updateDashboardUI();
-                    } else if (data.error) {
-                        showAddAccountView(true);
-                        document.getElementById('loginErrorMsg').innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
-                    } else {
-                        // Steam bağlantısı devam ediyorsa paneli açıp durum güncellenecek
-                        showView('accountDashboardView');
-                        updateDashboardUI();
-                    }
-                }
-            } catch (e) {}
-        }
-
-        function updateDashboardUI() {
-            if (!activeAccountData) return;
-
-            const acc = activeAccountData;
-            const displayName = acc.nickname ? `${acc.nickname} (${acc.persona || acc.username})` : (acc.persona || acc.username);
-
-            document.getElementById('dashAvatar').textContent = displayName.charAt(0).toUpperCase();
-            document.getElementById('dashPersona').textContent = acc.loggedIn ? displayName : `${displayName} (⚡ Bağlanılıyor...)`;
-            document.getElementById('dashSteamID').textContent = acc.steamID ? `SteamID: ${acc.steamID}` : `Kullanıcı: ${acc.username}`;
-
-            if (acc.personaState !== undefined) {
-                document.getElementById('dashPersonaSelect').value = String(acc.personaState);
-            }
-
-            const totSec = acc.totalIdleSeconds || 0;
-            const daySec = acc.dailySeconds || 0;
-            const weekSec = acc.weeklySeconds || 0;
-
-            document.getElementById('analyticsToday').textContent = formatSecondsShort(daySec);
-            document.getElementById('analyticsWeek').textContent = (weekSec / 3600).toFixed(1) + ' Sa';
-            document.getElementById('analyticsMonth').textContent = ((acc.monthlySeconds || 0) / 3600).toFixed(1) + ' Sa';
-            document.getElementById('analyticsTotal').textContent = formatSecondsLong(totSec);
-
-            const ownedCount = (acc.ownedGames && acc.ownedGames.length > 0) ? acc.ownedGames.length : popularGames.length;
-            document.getElementById('dashOwnedCount').textContent = ownedCount;
-            document.getElementById('countOwnedTab').textContent = ownedCount;
-
-            if (acc.games && acc.games.length > 0) {
-                acc.games.forEach(id => selectedAppIds.add(Number(id)));
-            } else if (selectedAppIds.size === 0) {
-                selectedAppIds.add(730); // Default CS2 (Counter-Strike 2)
-            }
-
-            const idleBtn = document.getElementById('btnIdleControl');
-
-            if (acc.games && acc.games.length > 0) {
-                idleBtn.innerHTML = '⏹ IDLE DURDUR';
-                idleBtn.className = 'btn btn-danger';
-            } else {
-                idleBtn.innerHTML = `▶ IDLE BAŞLAT (${selectedAppIds.size} Oyun)`;
-                idleBtn.className = 'btn btn-primary';
-            }
-
-            renderGamesList();
-        }
-
-        function formatSecondsShort(seconds) {
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            return `${h}s ${m}dk`;
-        }
-
-        function formatSecondsLong(seconds) {
-            const days = Math.floor(seconds / 86400);
-            const hours = Math.floor((seconds % 86400) / 3600);
-            if (days > 0) return `${days}g ${hours}sa`;
-            return `${hours} Sa`;
-        }
-
-        // ============================================================
-        // MASTER CONTROL
-        // ============================================================
-        async function masterStartIdleAll() {
-            if (accountsList.length === 0) { alert('Önce en az bir hesap ekleyin!'); return; }
-            if (!confirm('Tüm aktif hesaplarınızda aynı anda CS2 saat kasma başlatılsın mı?')) return;
-
-            try {
-                const data = await apiFetch('/api/session/idle-all', {
-                    method: 'POST',
-                    body: JSON.stringify({ appIds: [730] })
-                });
-
-                if (data.success) {
-                    alert(`🚀 Toplam ${data.count} adet hesapta saat kasma başlatıldı!`);
-                    await loadAccounts();
-                }
-            } catch (e) {}
-        }
-
-        async function masterStopIdleAll() {
-            if (!confirm('Tüm hesaplarınızdaki idle işlemi durdurulsun mu?')) return;
-
-            try {
-                const data = await apiFetch('/api/session/stop-all', { method: 'POST' });
-                if (data.success) {
-                    alert('⏹ Tüm hesaplarda idle durduruldu.');
-                    await loadAccounts();
-                }
-            } catch (e) {}
-        }
-
-        // ============================================================
-        // PERSONA STATE & NICKNAME
-        // ============================================================
-        async function changePersonaState(stateValue) {
-            if (!activeUsername) return;
-            try {
-                await apiFetch('/api/account/personastate', {
-                    method: 'POST',
-                    body: JSON.stringify({ username: activeUsername, personaState: Number(stateValue) })
-                });
-                await selectAccount(activeUsername);
-            } catch (e) {}
-        }
-
-        async function editCustomNickname() {
-            if (!activeUsername) return;
-            const currentNick = activeAccountData ? (activeAccountData.nickname || '') : '';
-            const newNick = prompt('Bu hesaba verilecek özel ismi girin (Örn: Ana Hesabım, Smurf CS2):', currentNick);
-
-            if (newNick !== null) {
-                try {
-                    await apiFetch('/api/account/nickname', {
-                        method: 'POST',
-                        body: JSON.stringify({ username: activeUsername, nickname: newNick })
-                    });
-                    await loadAccounts();
-                } catch (e) {}
-            }
-        }
-
-        // ============================================================
-        // LEADERBOARD MODAL
-        // ============================================================
-        function openLeaderboardModal() {
-            renderLeaderboard();
-            document.getElementById('leaderboardModal').classList.add('active');
-        }
-
-        function closeLeaderboardModal() {
-            document.getElementById('leaderboardModal').classList.remove('active');
-        }
-
-        function renderLeaderboard() {
-            const container = document.getElementById('leaderboardList');
-            container.innerHTML = '';
-
-            if (!leaderboardData || leaderboardData.length === 0) {
-                container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px;">Henüz aktif kasan hesap yok.</div>`;
-                return;
-            }
-
-            leaderboardData.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'leader-item';
-
-                let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
-                let rankBadge = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : `#${index + 1}`));
-
-                const name = item.nickname ? `${item.nickname} (${item.persona || item.username})` : (item.persona || item.username);
-                const totalHours = (item.totalIdleSeconds / 3600).toFixed(1);
-
-                div.innerHTML = `
-                    <div class="leader-rank ${rankClass}">${rankBadge}</div>
-                    <div class="leader-info">
-                        <div class="leader-name">${name}</div>
-                        <div class="leader-hours">${totalHours} Saat Kasdı ${item.isIdling ? '🟢 (Şu an kasıyor)' : ''}</div>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        // ============================================================
-        // LOGIN & STEAM GUARD
-        // ============================================================
-        async function submitLogin() {
-            const username = document.getElementById('loginUsername').value.trim();
-            const password = document.getElementById('loginPassword').value;
-            const btn = document.getElementById('btnLogin');
-            const errDiv = document.getElementById('loginErrorMsg');
+        async function doLogin() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+            const errDiv = document.getElementById('loginError');
 
             if (!username || !password) {
-                errDiv.innerHTML = '<div class="error-msg">Kullanıcı adı ve şifre girilmelidir!</div>';
+                errDiv.innerHTML = '<div class="error-box">Kullanıcı adı ve şifre girilmelidir</div>';
                 return;
             }
 
@@ -1224,41 +719,38 @@
             errDiv.innerHTML = '';
 
             try {
-                const data = await apiFetch('/api/account/login', {
+                const res = await fetch('/api/login', {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
+                const data = await res.json();
 
                 if (data.success) {
-                    activeUsername = username;
-                    await loadAccounts();
+                    await loadAccounts(username);
                 } else if (data.steamGuard) {
                     activeUsername = username;
-                    showView('steamGuardView');
-                    const promptEl = document.getElementById('steamGuardPrompt');
-                    if (data.type === 'email' && data.domain) {
-                        promptEl.innerHTML = `📧 <strong>[${username}]</strong> Hesabında E-Posta Kalkanı aktif! E-postana (<strong>${data.domain}</strong>) gönderilen 5 haneli Steam Guard kodunu girin.`;
-                    } else {
-                        promptEl.innerHTML = `📱 <strong>[${username}]</strong> Hesabında <u>Steam Mobil Kalkanı (Authenticator)</u> aktif!<br><span style="color: var(--gold); font-weight: 700;">⚠️ E-postaya kod gelmez!</span> Telefonundaki <strong>Steam Uygulamasını</strong> açıp <strong>Steam Guard (Kalkan 🛡️)</strong> sekmesindeki 5 haneli kodu girin.`;
-                    }
+                    const prompt = document.getElementById('guardPrompt');
+                    prompt.innerHTML = `<strong>[${username}]</strong> Hesabın için Steam Guard kodu gerekli. Kodu girin:`;
+                    showSection('guardSection');
                 } else {
-                    errDiv.innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
+                    errDiv.innerHTML = `<div class="error-box">❌ ${data.error}</div>`;
                 }
             } catch (e) {
-                errDiv.innerHTML = '<div class="error-msg">Sunucuya bağlanırken hata oluştu.</div>';
+                errDiv.innerHTML = '<div class="error-box">Sunucuya bağlanılamadı</div>';
             }
 
             btn.disabled = false;
-            btn.innerHTML = 'GİRİŞ YAP VE HESABI EKLE';
+            btn.innerHTML = 'GİRİŞ YAP';
         }
 
-        async function submitSteamGuard() {
+        async function doSteamGuard() {
             const code = document.getElementById('guardCode').value.trim();
-            const btn = document.getElementById('btnGuard');
-            const errDiv = document.getElementById('guardErrorMsg');
+            const btn = document.getElementById('guardBtn');
+            const errDiv = document.getElementById('guardError');
 
-            if (!code || !activeUsername) {
-                errDiv.innerHTML = '<div class="error-msg">Kodu girin!</div>';
+            if (!code) {
+                errDiv.innerHTML = '<div class="error-box">Kodu gir</div>';
                 return;
             }
 
@@ -1267,229 +759,409 @@
             errDiv.innerHTML = '';
 
             try {
-                const data = await apiFetch('/api/account/steamguard', {
+                const res = await fetch('/api/steamguard', {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: activeUsername, code })
                 });
+                const data = await res.json();
 
                 if (data.success) {
-                    await loadAccounts();
+                    await loadAccounts(activeUsername);
                 } else {
-                    errDiv.innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
+                    errDiv.innerHTML = `<div class="error-box">❌ ${data.error}</div>`;
                 }
             } catch (e) {
-                errDiv.innerHTML = '<div class="error-msg">Sunucu bağlantı hatası.</div>';
+                errDiv.innerHTML = '<div class="error-box">Sunucuya bağlanılamadı</div>';
             }
 
             btn.disabled = false;
             btn.innerHTML = 'KODU DOĞRULA';
         }
 
+        function showAddAccountScreen() {
+            activeUsername = null;
+            renderAccountsBar();
+            showSection('loginSection');
+            startQrLogin();
+            document.getElementById('loginError').innerHTML = '';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        // ============================================================
+        // ACCOUNTS MANAGEMENT & BAR
+        // ============================================================
+        async function loadAccounts(selectUser = null) {
+            try {
+                const res = await fetch('/api/accounts');
+                const data = await res.json();
+                accountsList = data.accounts || [];
+
+                renderAccountsBar();
+
+                if (accountsList.length > 0) {
+                    const target = selectUser || activeUsername || accountsList[0].username;
+                    selectAccount(target);
+                } else {
+                    showAddAccountScreen();
+                }
+            } catch (e) {}
+        }
+
+        function renderAccountsBar() {
+            const bar = document.getElementById('accountsBar');
+            const master = document.getElementById('masterBar');
+            bar.innerHTML = '';
+
+            if (accountsList.length > 0) {
+                master.style.display = 'flex';
+            } else {
+                master.style.display = 'none';
+            }
+
+            accountsList.forEach(acc => {
+                const tab = document.createElement('div');
+                const isSelected = acc.username.toLowerCase() === (activeUsername || '').toLowerCase();
+                tab.className = 'acc-tab' + (isSelected ? ' active' : '');
+                tab.onclick = () => selectAccount(acc.username);
+
+                const statusDot = (acc.games && acc.games.length > 0) ? '🟢' : (acc.loggedIn ? '🔵' : '🔴');
+                const sub = (acc.games && acc.games.length > 0) ? `(${acc.games.length} oyun)` : (acc.loggedIn ? 'Online' : 'Offline');
+
+                tab.innerHTML = `<span>${statusDot}</span> <span>${acc.persona || acc.username}</span> <small style="color:var(--text2);">${sub}</small>`;
+                bar.appendChild(tab);
+            });
+
+            // "+ Yeni Hesap Ekle" Butonu
+            const addBtn = document.createElement('div');
+            addBtn.className = 'acc-tab acc-tab-add';
+            addBtn.onclick = () => showAddAccountScreen();
+            addBtn.innerHTML = '➕ YENİ HESAP EKLE';
+            bar.appendChild(addBtn);
+        }
+
+        async function selectAccount(username) {
+            activeUsername = username;
+            renderAccountsBar();
+
+            try {
+                const res = await fetch(`/api/status?username=${encodeURIComponent(username)}`);
+                const data = await res.json();
+
+                if (data.success || data.loggedIn !== undefined) {
+                    showSection('dashSection');
+                    document.getElementById('displayName').textContent = data.persona || data.username;
+
+                    // Steam profile linki
+                    const profileLink = document.getElementById('steamProfileLink');
+                    if (data.steamID) {
+                        profileLink.href = `https://steamcommunity.com/profiles/${data.steamID}`;
+                        profileLink.style.display = 'inline-flex';
+                    } else {
+                        profileLink.style.display = 'none';
+                    }
+
+                    // Hesaptaki tespit edilen oyunları yükle
+                    if (data.ownedGames && data.ownedGames.length > 0) {
+                        allGames = data.ownedGames;
+                    }
+
+                    selectedAppIds.clear();
+                    if (data.games && data.games.length > 0) {
+                        data.games.forEach(id => selectedAppIds.add(Number(id)));
+                    } else {
+                        // Varsayılan olarak CS2 (730) seçili olsun
+                        selectedAppIds.add(730);
+                    }
+
+                    updateActiveAccountBadge(data);
+                    renderGames();
+                    updateActiveGames();
+                    updateIdleBtn();
+                }
+            } catch (e) {}
+        }
+
+        function updateActiveAccountBadge(data) {
+            const badge = document.getElementById('statusBadge');
+            const text = document.getElementById('statusText');
+            const label = document.getElementById('statusLabel');
+            const count = document.getElementById('gameCount');
+            const uptime = document.getElementById('uptimeDisplay');
+            const uptimeLbl = document.getElementById('uptimeLabel');
+            const liveDot = document.getElementById('liveDot');
+            const liveTitle = document.getElementById('liveTitle');
+            const liveSubTitle = document.getElementById('liveSubTitle');
+
+            const isIdling = data.games && data.games.length > 0;
+
+            if (isIdling) {
+                badge.className = 'status-badge idling';
+                text.textContent = 'Saat Kasılıyor';
+                label.textContent = '🔥 Kasıyor!';
+                count.textContent = data.games.length;
+                uptime.textContent = formatUptime(data.uptime || 0);
+                if (uptimeLbl) uptimeLbl.textContent = 'Kasılan Süre';
+
+                const gameNames = data.games.map(id => {
+                    const g = allGames.find(x => x.appId === Number(id));
+                    return g ? g.name : `#${id}`;
+                }).join(', ');
+
+                if (liveDot) liveDot.textContent = '🟢';
+                if (liveTitle) liveTitle.innerHTML = `Steam'de Aktif Oynanıyor: <span style="color:var(--green);">${gameNames}</span>`;
+                if (liveSubTitle) liveSubTitle.textContent = 'Oyun saatleriniz Steam sunucularında şu an başarıyla birikmektedir.';
+            } else if (data.loggedIn) {
+                badge.className = 'status-badge online';
+                text.textContent = 'Çevrimiçi';
+                label.textContent = 'Hazır';
+                count.textContent = '0';
+                uptime.textContent = '00:00:00';
+                if (uptimeLbl) uptimeLbl.textContent = 'İdle Süresi';
+
+                if (liveDot) liveDot.textContent = '🔵';
+                if (liveTitle) liveTitle.textContent = 'Steam Durumu: Hazır';
+                if (liveSubTitle) liveSubTitle.textContent = 'Oyunu başlatmak için aşağıdaki yeşil "IDLE BAŞLAT" butonuna bas.';
+            } else {
+                badge.className = 'status-badge offline';
+                text.textContent = 'Çevrimdışı';
+                label.textContent = 'Bağlantı Yok';
+                count.textContent = '0';
+                uptime.textContent = '00:00:00';
+
+                if (liveDot) liveDot.textContent = '🔴';
+                if (liveTitle) liveTitle.textContent = 'Steam Durumu: Çevrimdışı';
+                if (liveSubTitle) liveSubTitle.textContent = 'Bağlantı koptu. Lütfen yeniden giriş yapın.';
+            }
+        }
+
         // ============================================================
         // GAMES LIST & SELECTION
         // ============================================================
         async function loadPopularGames() {
-            try { popularGames = await apiFetch('/api/games'); } catch (e) {}
+            try {
+                const res = await fetch('/api/games');
+                allGames = await res.json();
+                renderGames();
+            } catch (e) {}
         }
 
-        function switchGameTab(tab) {
-            currentTab = tab;
-            document.getElementById('tabOwned').className = 'tab-btn' + (tab === 'owned' ? ' active' : '');
-            document.getElementById('tabPopular').className = 'tab-btn' + (tab === 'popular' ? ' active' : '');
-            renderGamesList();
+        function clearSelectedGames() {
+            selectedAppIds.clear();
+            renderGames();
+            updateActiveGames();
+            updateIdleBtn();
         }
 
-        function renderGamesList() {
-            const container = document.getElementById('gamesContainer');
-            const searchQuery = document.getElementById('gameSearchInput').value.toLowerCase().trim();
-            container.innerHTML = '';
+        function renderGames(filterText = '') {
+            const grid = document.getElementById('gamesGrid');
+            grid.innerHTML = '';
 
-            let listToRender = [];
-            if (currentTab === 'owned' && activeAccountData && activeAccountData.ownedGames && activeAccountData.ownedGames.length > 0) {
-                listToRender = activeAccountData.ownedGames;
-            } else {
-                listToRender = popularGames;
-            }
+            const q = String(filterText || '').toLowerCase().trim();
+            const filtered = q
+                ? allGames.filter(g => (g.name && g.name.toLowerCase().includes(q)) || String(g.appId).includes(q))
+                : allGames;
 
-            if (searchQuery) {
-                listToRender = listToRender.filter(g =>
-                    g.name.toLowerCase().includes(searchQuery) || String(g.appId).includes(searchQuery)
-                );
-            }
-
-            if (listToRender.length === 0) {
-                container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 30px; font-size: 0.85rem;">Aranan oyun bulunamadı.</div>`;
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text2); padding: 20px;">Oyun bulunamadı. Aşağıdan App ID ile ekleyebilirsiniz.</div>';
                 return;
             }
 
-            listToRender.forEach(game => {
-                const card = document.createElement('div');
-                const isSelected = selectedAppIds.has(Number(game.appId));
-                card.className = 'game-card' + (isSelected ? ' selected' : '');
-                card.onclick = () => toggleGameSelection(Number(game.appId));
-
-                card.innerHTML = `
-                    <div class="game-checkbox"></div>
-                    <span class="game-title" title="${game.name}">${game.name}</span>
-                    <span class="game-appid">#${game.appId}</span>
+            filtered.forEach(game => {
+                const isSelected = selectedAppIds.has(game.appId);
+                const div = document.createElement('div');
+                div.className = 'game-item' + (isSelected ? ' selected' : '');
+                div.onclick = () => toggleGame(game.appId);
+                div.innerHTML = `
+                    <div class="game-check"></div>
+                    <span class="game-label">${game.name}</span>
+                    <span class="game-id">${game.appId}</span>
                 `;
-                container.appendChild(card);
+                grid.appendChild(div);
             });
         }
 
-        function toggleGameSelection(appId) {
+        function toggleGame(appId) {
             if (selectedAppIds.has(appId)) {
                 selectedAppIds.delete(appId);
             } else {
                 if (selectedAppIds.size >= 32) {
-                    alert('Steam aynı anda en fazla 32 oyun idle etmeye izin verir!');
+                    alert('En fazla 32 oyun seçebilirsin!');
                     return;
                 }
                 selectedAppIds.add(appId);
             }
-            updateDashboardUI();
+            const searchVal = document.getElementById('gameSearch') ? document.getElementById('gameSearch').value : '';
+            renderGames(searchVal);
+            updateActiveGames();
+            updateIdleBtn();
         }
 
         function addCustomAppId() {
-            const input = document.getElementById('customAppIdInput');
-            const appId = parseInt(input.value);
-            if (!appId || appId <= 0) return;
+            const input = document.getElementById('customAppId');
+            const id = parseInt(input.value);
+            if (!id || id <= 0) return;
 
-            selectedAppIds.add(appId);
+            if (!allGames.find(g => g.appId === id)) {
+                allGames.unshift({ appId: id, name: `Oyun #${id}` });
+            }
+            selectedAppIds.add(id);
             input.value = '';
-            updateDashboardUI();
+            const searchVal = document.getElementById('gameSearch') ? document.getElementById('gameSearch').value : '';
+            renderGames(searchVal);
+            updateActiveGames();
+            updateIdleBtn();
         }
 
-        // ============================================================
-        // IDLE START / STOP
-        // ============================================================
-        async function toggleIdle() {
-            if (!activeAccountData || !activeUsername) return;
+        function updateIdleBtn() {
+            const btn = document.getElementById('idleBtn');
+            const curAcc = accountsList.find(a => a.username.toLowerCase() === (activeUsername || '').toLowerCase());
+            const isIdling = curAcc && curAcc.games && curAcc.games.length > 0;
 
-            const isCurrentlyIdling = activeAccountData.games && activeAccountData.games.length > 0;
-
-            if (isCurrentlyIdling) {
-                try {
-                    await apiFetch('/api/account/stop', {
-                        method: 'POST',
-                        body: JSON.stringify({ username: activeUsername })
-                    });
-                    await selectAccount(activeUsername);
-                } catch (e) {}
+            if (isIdling) {
+                btn.innerHTML = '⏹ IDLE DURDUR';
+                btn.className = 'btn btn-danger';
             } else {
-                if (selectedAppIds.size === 0) {
-                    alert('Lütfen en az 1 oyun seçin!');
-                    return;
-                }
-
-                try {
-                    const data = await apiFetch('/api/account/idle', {
-                        method: 'POST',
-                        body: JSON.stringify({ username: activeUsername, appIds: Array.from(selectedAppIds) })
-                    });
-
-                    if (data.success) {
-                        await selectAccount(activeUsername);
-                    } else {
-                        alert('Hata: ' + data.error);
-                    }
-                } catch (e) {}
+                const count = selectedAppIds.size > 0 ? selectedAppIds.size : 1;
+                btn.innerHTML = `▶ IDLE BAŞLAT (${count} Oyun)`;
+                btn.className = 'btn btn-success';
+                btn.disabled = false;
             }
         }
 
+        function updateActiveGames() {
+            const container = document.getElementById('activeGames');
+            container.innerHTML = '';
+
+            selectedAppIds.forEach(id => {
+                const game = allGames.find(g => g.appId === id);
+                const name = game ? game.name : `#${id}`;
+                container.innerHTML += `
+                    <span class="active-game-tag">
+                        <span class="tag-dot"></span>
+                        ${name}
+                    </span>
+                `;
+            });
+        }
+
         // ============================================================
-        // LOGOUT ACCOUNT
+        // SINGLE & MASTER IDLE CONTROLS
         // ============================================================
-        async function logoutAccount() {
+        async function toggleActiveAccountIdle() {
             if (!activeUsername) return;
-            if (!confirm(`[${activeUsername}] hesabını kaldırmak istediğinize emin misiniz? Idle duracaktır.`)) return;
+            const curAcc = accountsList.find(a => a.username.toLowerCase() === activeUsername.toLowerCase());
+            const isIdling = curAcc && curAcc.games && curAcc.games.length > 0;
+
+            if (isIdling) {
+                try {
+                    await fetch('/api/stop', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: activeUsername })
+                    });
+                    await loadAccounts(activeUsername);
+                } catch (e) {}
+            } else {
+                if (selectedAppIds.size === 0) {
+                    selectedAppIds.add(730);
+                    renderGames();
+                }
+                try {
+                    const res = await fetch('/api/idle', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: activeUsername, appIds: [...selectedAppIds] })
+                    });
+                    const resData = await res.json();
+                    if (!resData.success) {
+                        alert('Hata: ' + (resData.error || 'Oyun başlatılamadı'));
+                    }
+                    await loadAccounts(activeUsername);
+                } catch (e) {
+                    alert('Sunucuya bağlanılamadı');
+                }
+            }
+        }
+
+        async function masterStartIdleAll() {
+            if (accountsList.length === 0) return;
+            if (!confirm('Tüm açık hesaplarda aynı anda saat kasma başlatılsın mı?')) return;
 
             try {
-                await apiFetch('/api/account/logout', {
+                await fetch('/api/idle-all', {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appIds: [730] })
+                });
+                await loadAccounts(activeUsername);
+            } catch (e) {}
+        }
+
+        async function masterStopIdleAll() {
+            if (!confirm('Tüm hesaplardaki saat kasma durdurulsun mu?')) return;
+
+            try {
+                await fetch('/api/stop-all', { method: 'POST' });
+                await loadAccounts(activeUsername);
+            } catch (e) {}
+        }
+
+        async function doLogoutAccount() {
+            if (!activeUsername) return;
+            if (!confirm(`[${activeUsername}] hesabını kaldırmak istediğinize emin misiniz?`)) return;
+
+            try {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: activeUsername })
                 });
                 activeUsername = null;
-                selectedAppIds.clear();
                 await loadAccounts();
             } catch (e) {}
         }
 
         // ============================================================
-        // REALTIME POLLING
+        // REALTIME STATUS POLLING
         // ============================================================
-        function startPolling() {
-            if (pollingInterval) clearInterval(pollingInterval);
-            pollingInterval = setInterval(async () => {
+        function startRealtimePolling() {
+            if (statusInterval) clearInterval(statusInterval);
+            statusInterval = setInterval(async () => {
                 if (activeUsername) {
-                    const data = await apiFetch(`/api/account/status?username=${encodeURIComponent(activeUsername)}`);
-                    if (data.success) {
-                        const prevOwnedCount = (activeAccountData && activeAccountData.ownedGames) ? activeAccountData.ownedGames.length : 0;
-                        activeAccountData = data;
+                    try {
+                        const res = await fetch(`/api/status?username=${encodeURIComponent(activeUsername)}`);
+                        const data = await res.json();
+                        if (data.success || data.loggedIn !== undefined) {
+                            updateActiveAccountBadge(data);
 
-                        // Oturum bağlandıysa ve giriş/guard ekranındaysa otomatik paneli aç
-                        if (data.loggedIn && (document.getElementById('addAccountView').classList.contains('active') || document.getElementById('steamGuardView').classList.contains('active'))) {
-                            showView('accountDashboardView');
-                        }
-
-                        if (document.getElementById('accountDashboardView').classList.contains('active')) {
-                            const daySec = data.dailySeconds || 0;
-                            const weekSec = data.weeklySeconds || 0;
-                            const totSec = data.totalIdleSeconds || 0;
-
-                            document.getElementById('analyticsToday').textContent = formatSecondsShort(daySec);
-                            document.getElementById('analyticsWeek').textContent = (weekSec / 3600).toFixed(1) + ' Sa';
-                            document.getElementById('analyticsMonth').textContent = ((data.monthlySeconds || 0) / 3600).toFixed(1) + ' Sa';
-                            document.getElementById('analyticsTotal').textContent = formatSecondsLong(totSec);
-
-                            const newOwnedCount = (data.ownedGames && data.ownedGames.length > 0) ? data.ownedGames.length : popularGames.length;
-                            document.getElementById('dashOwnedCount').textContent = newOwnedCount;
-                            document.getElementById('countOwnedTab').textContent = newOwnedCount;
-
-                            if (newOwnedCount !== prevOwnedCount) {
-                                renderGamesList();
+                            const accInList = accountsList.find(a => a.username.toLowerCase() === activeUsername.toLowerCase());
+                            if (accInList) {
+                                accInList.games = data.games || [];
+                                accInList.loggedIn = data.loggedIn;
+                                updateIdleBtn();
+                                renderAccountsBar();
                             }
                         }
-                    }
+                    } catch (e) {}
                 }
             }, 2000);
         }
 
         // ============================================================
-        // INIT & EVENT LISTENERS
+        // INIT
         // ============================================================
-        window.switchLoginMode = switchLoginMode;
-        window.startQrLoginFlow = startQrLoginFlow;
-        window.showAddAccountView = showAddAccountView;
-        window.submitLogin = submitLogin;
-        window.submitSteamGuard = submitSteamGuard;
-        window.masterStartIdleAll = masterStartIdleAll;
-        window.masterStopIdleAll = masterStopIdleAll;
-        window.setTheme = setTheme;
-        window.openLeaderboardModal = openLeaderboardModal;
-        window.closeLeaderboardModal = closeLeaderboardModal;
-        window.toggleIdle = toggleIdle;
-        window.logoutAccount = logoutAccount;
-        window.editCustomNickname = editCustomNickname;
-        window.changePersonaState = changePersonaState;
-        window.switchGameTab = switchGameTab;
-        window.addCustomAppId = addCustomAppId;
-
         async function init() {
-            setTheme(savedTheme);
             await loadPopularGames();
             await loadAccounts();
-            startPolling();
+            startRealtimePolling();
         }
 
         window.addEventListener('DOMContentLoaded', () => {
             init();
-            const userInput = document.getElementById('loginUsername');
-            if (userInput) userInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-            const passInput = document.getElementById('loginPassword');
-            if (passInput) passInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-            const guardInput = document.getElementById('guardCode');
-            if (guardInput) guardInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitSteamGuard(); });
+            document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+            document.getElementById('guardCode').addEventListener('keydown', e => { if (e.key === 'Enter') doSteamGuard(); });
         });
     </script>
 </body>

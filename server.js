@@ -2,95 +2,50 @@ const express = require('express');
 const SteamUser = require('steam-user');
 const { LoginSession, EAuthTokenPlatformType } = require('steam-session');
 const QRCode = require('qrcode');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
-
-// ============================================================
-// GÜVENLİK ÖNLEMLERİ (SECURITY & HARDENING)
-// ============================================================
-
-// 1. Sunucu Bilgisini Gizle (Anti-Fingerprinting)
-app.disable('x-powered-by');
-
-// 2. CORS & HTTP Güvenlik Başlıkları
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-id, Authorization');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
-
-app.use(helmet({
-    contentSecurityPolicy: false, // CSP kısıtlamaları yerel testlerde engel çıkarmasın
-    crossOriginEmbedderPolicy: false,
-    frameguard: false
-}));
-
-app.use(express.json({ limit: '10kb' })); // Anti-Payload Bomb
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 3. Rate Limiting (DDoS & Brute Force Saldırı Koruması)
-const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10000,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => req.path.includes('/status') || req.path.includes('/accounts')
-});
-app.use('/api/', globalLimiter);
+// ============================================================
+// KALICI OTURUM YÖNETİMİ (SESSIONS.JSON)
+// ============================================================
+const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
 
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 1000,
-    standardHeaders: true,
-    legacyHeaders: false
-});
-app.use('/api/account/login', loginLimiter);
-app.use('/api/account/steamguard', loginLimiter);
-
-// 4. Input Sanitization & Anti-Injection Middleware (XSS, SQLi, Prototype Pollution Koruması)
-function sanitizeInput(input) {
-    if (typeof input === 'string') {
-        // HTML/Script/SQL karakterlerini temizle ve zararlı kodları etkisizleştir
-        return input
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/'/g, '&#39;')
-            .replace(/"/g, '&quot;')
-            .replace(/`/g, '&#96;')
-            .replace(/;/g, '')
-            .trim();
-    }
-    return input;
+function saveAccountSession(username, refreshToken) {
+    if (!username || !refreshToken) return;
+    let data = {};
+    try {
+        if (fs.existsSync(SESSIONS_FILE)) {
+            data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+        }
+    } catch (e) {}
+    data[username.toLowerCase()] = { username, refreshToken, lastSaved: Date.now() };
+    try {
+        fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {}
 }
 
-app.use((req, res, next) => {
-    if (req.body && typeof req.body === 'object') {
-        // Prototype Pollution Koruması (__proto__ veya constructor tahrifatını engelleme)
-        if (Object.prototype.hasOwnProperty.call(req.body, '__proto__') || Object.prototype.hasOwnProperty.call(req.body, 'constructor')) {
-            return res.status(400).json({ success: false, error: 'Geçersiz veri yapısı' });
+function removeAccountSession(username) {
+    if (!username) return;
+    try {
+        if (fs.existsSync(SESSIONS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+            delete data[username.toLowerCase()];
+            fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2));
         }
-        for (const key in req.body) {
-            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                // Şifre ve Steam Guard kodları asla sanitization işleminden geçirilmez
-                if (key !== 'password' && key !== 'code') {
-                    req.body[key] = sanitizeInput(req.body[key]);
-                }
-            }
-        }
-    }
-    next();
-});
+    } catch (e) {}
+}
 
 // ============================================================
-// STEAM IDLE VERİ YAPILARI
+// ÇOKLU HESAP & OTURUM VERİ YAPILARI
 // ============================================================
+const accounts = new Map(); // username.toLowerCase() -> account state
+const pendingQrSessions = new Map(); // qrSessionId -> state
+
+// Popüler oyunlar listesi
 const POPULAR_GAMES = [
     { appId: 730, name: 'Counter-Strike 2' },
     { appId: 570, name: 'Dota 2' },
@@ -120,75 +75,34 @@ const POPULAR_GAMES = [
     { appId: 739630, name: 'Phasmophobia' },
 ];
 
-const accounts = new Map();
-const sessionAccounts = new Map();
-const pendingQrSessions = new Map();
+function getOrCreateAccount(rawUsername) {
+    const cleanUser = String(rawUsername).trim();
+    const key = cleanUser.toLowerCase();
 
-function getAccountKey(sessionId, username) {
-    const cleanSession = String(sessionId).replace(/[^a-zA-Z0-9_-]/g, '');
-    const cleanUser = String(username).toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '');
-    return `${cleanSession}:${cleanUser}`;
-}
-
-function getOrCreateAccount(sessionId, username) {
-    const key = getAccountKey(sessionId, username);
     if (accounts.has(key)) {
         return accounts.get(key);
     }
 
     const acc = {
         key,
-        sessionId,
-        username: String(username).trim(),
-        nickname: null,
+        username: cleanUser,
         persona: null,
         steamID: null,
         loggedIn: false,
+        games: [],
+        ownedGames: [],
         steamGuardNeeded: false,
         steamGuardType: null,
         pendingSteamGuardCallback: null,
         error: null,
-        personaState: SteamUser.EPersonaState.Online,
-        games: [],
-        ownedGames: [],
         startTime: null,
-        totalIdleSeconds: 0,
-        dailySeconds: 0,
-        weeklySeconds: 0,
-        monthlySeconds: 0,
+        totalSeconds: 0,
         client: null
     };
 
     accounts.set(key, acc);
-
-    if (!sessionAccounts.has(sessionId)) {
-        sessionAccounts.set(sessionId, new Set());
-    }
-    sessionAccounts.get(sessionId).add(key);
-
     return acc;
 }
-
-// 5. Bellek Şişmesi & Çöp Temizleyici (Garbage Collection & DoS Protection)
-setInterval(() => {
-    // Saniye sayacı
-    for (const acc of accounts.values()) {
-        if (acc.loggedIn && acc.games && acc.games.length > 0) {
-            acc.totalIdleSeconds = (acc.totalIdleSeconds || 0) + 1;
-            acc.dailySeconds = (acc.dailySeconds || 0) + 1;
-            acc.weeklySeconds = (acc.weeklySeconds || 0) + 1;
-            acc.monthlySeconds = (acc.monthlySeconds || 0) + 1;
-        }
-    }
-
-    // Zaman aşımına uğramış QR oturumlarını bellekten temizle
-    const now = Date.now();
-    for (const [qrId, state] of pendingQrSessions.entries()) {
-        if (state.createdAt && (now - state.createdAt > 180000)) { // 3 dakika
-            pendingQrSessions.delete(qrId);
-        }
-    }
-}, 1000);
 
 function createSteamClientForAccount(acc) {
     if (acc.client) {
@@ -209,65 +123,71 @@ function createSteamClientForAccount(acc) {
         acc.steamGuardNeeded = false;
         acc.error = null;
         acc.steamID = client.steamID ? client.steamID.getSteamID64() : null;
-        if (!acc.startTime) acc.startTime = Date.now();
 
         try {
-            client.setPersona(acc.personaState || SteamUser.EPersonaState.Online);
+            client.setPersona(SteamUser.EPersonaState.Online);
         } catch (e) {}
 
         if (acc.games && acc.games.length > 0) {
-            try {
-                client.gamesPlayed(acc.games);
-                console.log(`🎮 [${acc.username}] ${acc.games.length} oyun için otomatik idle başlatıldı: ${acc.games.join(', ')}`);
-            } catch (e) {}
+            acc.startTime = Date.now();
+            try { client.gamesPlayed(acc.games, true); } catch (e) {}
+        } else {
+            acc.startTime = null;
         }
     });
 
     client.on('accountInfo', (name) => {
-        acc.persona = sanitizeInput(name);
+        acc.persona = name;
     });
 
-    client.on('steamGuard', (domain, callback) => {
-        console.log(`🔐 [${acc.username}] Steam Guard kodu bekleniyor (${domain ? 'e-posta: ' + domain : 'mobil uygulama'})`);
-        acc.steamGuardNeeded = true;
-        acc.steamGuardType = domain ? 'email' : 'app';
-        acc.pendingSteamGuardCallback = callback;
+    client.on('refreshToken', (token) => {
+        console.log(`🔑 [${acc.username}] Yeni oturum anahtarı kaydedildi`);
+        saveAccountSession(acc.username, token);
+    });
+
+    client.on('playingState', (blocked, playingApp) => {
+        console.log(`🎮 [${acc.username}] Oynama durumu: blocked=${blocked}, playingApp=${playingApp}`);
+    });
+
+    client.on('appLaunched', (appid) => {
+        console.log(`🚀 [${acc.username}] Steam oyunu onayladı ve başlattı: AppID ${appid}`);
+    });
+
+    client.on('appQuit', (appid) => {
+        console.log(`🛑 [${acc.username}] Steam oyunu durduruldu: AppID ${appid}`);
     });
 
     client.on('ownershipCached', () => {
         try {
             const ownedAppIds = client.getOwnedApps() || [];
-            console.log(`📦 [${acc.username}] ${ownedAppIds.length} adet oyun/lisans tespit edildi.`);
-
-            const ownedList = [];
+            console.log(`📦 [${acc.username}] ${ownedAppIds.length} adet lisans/oyun tespit edildi.`);
+            const list = [];
             ownedAppIds.forEach(appId => {
                 const idNum = Number(appId);
                 const pop = POPULAR_GAMES.find(g => g.appId === idNum);
                 let name = pop ? pop.name : null;
-
                 if (!name && client.picsCache && client.picsCache.apps && client.picsCache.apps[idNum]) {
-                    const appInfo = client.picsCache.apps[idNum].appinfo;
-                    if (appInfo && appInfo.common && appInfo.common.name) {
-                        name = sanitizeInput(appInfo.common.name);
-                    }
+                    const info = client.picsCache.apps[idNum].appinfo;
+                    if (info && info.common && info.common.name) name = info.common.name;
                 }
-
-                ownedList.push({
-                    appId: idNum,
-                    name: name || `Oyun #${idNum}`
-                });
+                list.push({ appId: idNum, name: name || `Oyun #${idNum}` });
             });
+            acc.ownedGames = list;
+        } catch (e) {}
+    });
 
-            acc.ownedGames = ownedList;
-        } catch (e) {
-            console.error(`[${acc.username}] Oyun lisansları işlenirken hata:`, e);
-        }
+    client.on('steamGuard', (domain, callback) => {
+        console.log(`🔐 [${acc.username}] Steam Guard kodu gerekli (${domain ? 'e-posta: ' + domain : 'mobil uygulama'})`);
+        acc.steamGuardNeeded = true;
+        acc.steamGuardType = domain ? 'email' : 'app';
+        acc.pendingSteamGuardCallback = callback;
     });
 
     client.on('error', (err) => {
         console.error(`❌ [${acc.username}] Steam hatası:`, err.message);
         acc.loggedIn = false;
         acc.games = [];
+        acc.startTime = null;
         acc.error = getSteamErrorMessage(err);
     });
 
@@ -275,6 +195,7 @@ function createSteamClientForAccount(acc) {
         console.log(`🔌 [${acc.username}] Steam bağlantısı kesildi:`, msg);
         acc.loggedIn = false;
         acc.games = [];
+        acc.startTime = null;
     });
 
     return client;
@@ -283,253 +204,140 @@ function createSteamClientForAccount(acc) {
 function getSteamErrorMessage(err) {
     const messages = {
         61: 'Geçersiz şifre',
-        63: 'Hesap kilitlendi - çok fazla hatalı giriş denemesi yapıldı',
+        63: 'Hesap kilitlendi - çok fazla hatalı giriş',
         65: 'Steam Guard kodu geçersiz',
         66: 'Steam Guard kodu gerekli',
-        84: 'Rate limit - biraz bekleyin ve tekrar deneyin',
+        84: 'Rate limit - biraz bekle ve tekrar dene',
         5: 'Geçersiz şifre',
     };
     return messages[err.eresult] || err.message || 'Bilinmeyen hata';
 }
 
-function getLeaderboardForSession(sessionId) {
-    const keys = sessionAccounts.get(sessionId) || new Set();
-    const list = [];
-
-    for (const key of keys) {
-        const acc = accounts.get(key);
-        if (!acc) continue;
-
-        list.push({
-            username: acc.username,
-            nickname: acc.nickname,
-            persona: acc.persona || acc.username,
-            totalIdleSeconds: acc.totalIdleSeconds || 0,
-            dailySeconds: acc.dailySeconds || 0,
-            weeklySeconds: acc.weeklySeconds || 0,
-            monthlySeconds: acc.monthlySeconds || 0,
-            isIdling: acc.games.length > 0,
-            activeGamesCount: acc.games.length
-        });
+// Sayaç & Bellek temizleyici (Saniyede bir)
+setInterval(() => {
+    for (const acc of accounts.values()) {
+        if (acc.loggedIn && acc.games && acc.games.length > 0) {
+            acc.totalSeconds = (acc.totalSeconds || 0) + 1;
+        }
     }
 
-    list.sort((a, b) => b.totalIdleSeconds - a.totalIdleSeconds);
-    return list;
+    const now = Date.now();
+    for (const [id, state] of pendingQrSessions.entries()) {
+        if (state.createdAt && (now - state.createdAt > 180000)) {
+            pendingQrSessions.delete(id);
+        }
+    }
+}, 1000);
+
+function loadSavedSessions() {
+    try {
+        if (!fs.existsSync(SESSIONS_FILE)) return;
+        const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+        for (const [key, sess] of Object.entries(data)) {
+            if (sess && sess.refreshToken && sess.username) {
+                console.log(`🔄 Kayıtlı oturum geri yükleniyor: ${sess.username}`);
+                const acc = getOrCreateAccount(sess.username);
+                const client = createSteamClientForAccount(acc);
+                client.logOn({ refreshToken: sess.refreshToken });
+            }
+        }
+    } catch (e) {
+        console.error('Kayıtlı oturumlar yüklenirken hata:', e.message);
+    }
 }
 
 // ============================================================
 // API ROUTES
 // ============================================================
 
-app.get('/api/session/accounts', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.query.sid;
-    if (!sessionId) return res.json({ success: true, accounts: [], leaderboard: [] });
-
-    const keys = sessionAccounts.get(sessionId) || new Set();
-    const result = [];
-
-    for (const key of keys) {
-        const acc = accounts.get(key);
-        if (!acc) continue;
-
-        const uptime = acc.startTime ? Math.floor((Date.now() - acc.startTime) / 1000) : 0;
-        result.push({
+// 1. Tüm hesapları listele
+app.get('/api/accounts', (req, res) => {
+    const list = [];
+    for (const acc of accounts.values()) {
+        const uptime = (acc.startTime && acc.games && acc.games.length > 0)
+            ? Math.floor((Date.now() - acc.startTime) / 1000)
+            : 0;
+        list.push({
             username: acc.username,
-            nickname: acc.nickname,
             persona: acc.persona || acc.username,
             steamID: acc.steamID,
             loggedIn: acc.loggedIn,
             steamGuardNeeded: acc.steamGuardNeeded,
             steamGuardType: acc.steamGuardType,
-            personaState: acc.personaState,
-            isIdling: acc.games.length > 0,
-            activeGamesCount: acc.games.length,
-            activeGames: acc.games,
-            ownedGamesCount: acc.ownedGames.length,
-            totalIdleSeconds: acc.totalIdleSeconds,
-            dailySeconds: acc.dailySeconds,
-            weeklySeconds: acc.weeklySeconds,
-            monthlySeconds: acc.monthlySeconds,
+            games: acc.games || [],
+            ownedGamesCount: acc.ownedGames ? acc.ownedGames.length : 0,
             error: acc.error,
-            uptime
+            uptime: uptime,
+            totalSeconds: acc.totalSeconds || 0
+        });
+    }
+    res.json({ success: true, accounts: list });
+});
+
+// 2. Tek bir hesabın detaylı durumunu al
+app.get('/api/status', (req, res) => {
+    const username = req.query.username;
+
+    if (!username) {
+        const first = accounts.values().next().value;
+        if (!first) {
+            return res.json({ loggedIn: false, accountsCount: 0 });
+        }
+        const uptime = (first.startTime && first.games && first.games.length > 0)
+            ? Math.floor((Date.now() - first.startTime) / 1000)
+            : 0;
+        return res.json({
+            loggedIn: first.loggedIn,
+            username: first.username,
+            persona: first.persona || first.username,
+            steamID: first.steamID,
+            games: first.games || [],
+            ownedGames: (first.ownedGames && first.ownedGames.length > 0) ? first.ownedGames : POPULAR_GAMES,
+            steamGuardNeeded: first.steamGuardNeeded,
+            steamGuardType: first.steamGuardType,
+            error: first.error,
+            uptime: uptime,
+            totalSeconds: first.totalSeconds || 0,
+            accountsCount: accounts.size
         });
     }
 
-    const leaderboard = getLeaderboardForSession(sessionId);
-    res.json({ success: true, accounts: result, leaderboard });
-});
-
-app.get('/api/account/status', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.query.sid;
-    const username = req.query.username;
-
-    if (!sessionId || !username) {
-        return res.json({ success: false, error: 'Oturum ID ve kullanıcı adı gerekli' });
-    }
-
-    const key = getAccountKey(sessionId, username);
+    const key = String(username).toLowerCase().trim();
     const acc = accounts.get(key);
     if (!acc) {
         return res.json({ success: false, error: 'Hesap bulunamadı' });
     }
 
-    const uptime = acc.startTime ? Math.floor((Date.now() - acc.startTime) / 1000) : 0;
-    const effectiveOwnedGames = (acc.ownedGames && acc.ownedGames.length > 0) ? acc.ownedGames : POPULAR_GAMES;
-
+    const uptime = (acc.startTime && acc.games && acc.games.length > 0)
+        ? Math.floor((Date.now() - acc.startTime) / 1000)
+        : 0;
     res.json({
         success: true,
+        loggedIn: acc.loggedIn,
         username: acc.username,
-        nickname: acc.nickname,
         persona: acc.persona || acc.username,
         steamID: acc.steamID,
-        loggedIn: acc.loggedIn,
+        games: acc.games || [],
+        ownedGames: (acc.ownedGames && acc.ownedGames.length > 0) ? acc.ownedGames : POPULAR_GAMES,
         steamGuardNeeded: acc.steamGuardNeeded,
         steamGuardType: acc.steamGuardType,
-        personaState: acc.personaState,
         error: acc.error,
-        games: acc.games,
-        ownedGames: effectiveOwnedGames,
-        totalIdleSeconds: acc.totalIdleSeconds,
-        dailySeconds: acc.dailySeconds,
-        weeklySeconds: acc.weeklySeconds,
-        monthlySeconds: acc.monthlySeconds,
-        uptime
+        uptime: uptime,
+        totalSeconds: acc.totalSeconds || 0,
+        accountsCount: accounts.size
     });
 });
 
-app.post('/api/account/login', async (req, res) => {
-    const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
-    const { username, password } = req.body || {};
-
-    if (!sessionId || !username || !password) {
-        return res.json({ success: false, error: 'Kullanıcı adı ve şifre gerekli' });
-    }
-
-    const acc = getOrCreateAccount(sessionId, username);
-    acc.error = null;
-    acc.steamGuardNeeded = false;
-
-    // 1. Primary: Steam WebBrowser Authentication Session (Explicit Email Code Dispatch)
-    try {
-        const loginSession = new LoginSession(EAuthTokenPlatformType.WebBrowser);
-        acc.loginSession = loginSession;
-
-        let startRes;
-        try {
-            startRes = await loginSession.startWithCredentials({
-                accountName: username,
-                password: password
-            });
-        } catch (err) {
-            console.error(`❌ [${username}] WebBrowser loginSession error:`, err.message);
-            const errMsg = getSteamErrorMessage(err);
-            acc.error = errMsg;
-            return res.json({ success: false, error: errMsg });
-        }
-
-        if (startRes.actionRequired) {
-            acc.steamGuardNeeded = true;
-            acc.steamGuardType = 'email';
-
-            // E-posta kodunun kullanıcı e-postasına gönderilmesini tetikle
-            try {
-                await loginSession._attemptEmailCodeAuth();
-                console.log(`📧 [${username}] E-Posta kodu gönderme isteği Steam WebAPI'ye iletildi!`);
-            } catch (e) {
-                console.log(`ℹ️ [${username}] Email code auth attempt info:`, e.message);
-            }
-
-            return res.json({
-                success: false,
-                steamGuard: true,
-                type: 'email',
-                username: acc.username
-            });
-        }
-
-        if (loginSession.refreshToken) {
-            const client = createSteamClientForAccount(acc);
-            client.logOn({ refreshToken: loginSession.refreshToken });
-            return res.json({ success: true, username: acc.username });
-        }
-    } catch (e) {
-        console.error(`❌ [${username}] LoginSession WebBrowser exception:`, e);
-    }
-
-    // 2. Fallback: Direct SteamUser Client logOn
-    const client = createSteamClientForAccount(acc);
-
-    let responded = false;
-    const sendResponse = (payload) => {
-        if (responded || res.headersSent) return;
-        responded = true;
-        clearTimeout(timeout);
-        clearInterval(checkInterval);
-        res.json(payload);
-    };
-
-    client.once('loggedOn', () => {
-        sendResponse({ success: true, username: acc.username });
-    });
-
-    client.once('steamGuard', (domain) => {
-        console.log(`📧 [${acc.username}] Steam E-postaya kod gönderdi! Domain: ${domain || 'e-posta'}`);
-        sendResponse({
-            success: false,
-            steamGuard: true,
-            type: domain ? 'email' : 'app',
-            domain: domain || null,
-            username: acc.username
-        });
-    });
-
-    client.once('error', (err) => {
-        sendResponse({ success: false, error: getSteamErrorMessage(err) });
-    });
-
-    client.logOn({
-        accountName: username,
-        password: password
-    });
-
-    const timeout = setTimeout(() => {
-        if (acc.steamGuardNeeded) {
-            sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
-        } else if (acc.error) {
-            sendResponse({ success: false, error: acc.error });
-        } else if (acc.loggedIn) {
-            sendResponse({ success: true, username: acc.username });
-        } else {
-            sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı. Lütfen şifrenizi kontrol edip tekrar deneyin.' });
-        }
-    }, 8000);
-
-    const checkInterval = setInterval(() => {
-        if (acc.loggedIn || acc.error || acc.steamGuardNeeded) {
-            if (acc.steamGuardNeeded) {
-                sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
-            } else if (acc.error) {
-                sendResponse({ success: false, error: acc.error });
-            } else {
-                sendResponse({ success: true, username: acc.username });
-            }
-        }
-    }, 300);
-});
-
-app.post('/api/account/qr-start', async (req, res) => {
-    const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
-    if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
-
+// 3. QR Kod Oturumu Başlat
+app.post('/api/qr-start', async (req, res) => {
     try {
         const loginSession = new LoginSession(EAuthTokenPlatformType.SteamClient);
         const qrSessionId = 'qr_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
 
         const { qrChallengeUrl } = await loginSession.startWithQR();
-        const qrDataUrl = await QRCode.toDataURL(qrChallengeUrl, { margin: 2, width: 260 });
+        const qrDataUrl = await QRCode.toDataURL(qrChallengeUrl, { margin: 2, width: 240 });
 
         const sessionState = {
-            sessionId,
             qrSessionId,
             loginSession,
             authenticated: false,
@@ -547,26 +355,26 @@ app.post('/api/account/qr-start', async (req, res) => {
 
                 console.log(`✅ [QR Login] Steam Mobil QR Taraması Başarılı! Kullanıcı: ${username}`);
 
-                const acc = getOrCreateAccount(sessionId, username);
+                const acc = getOrCreateAccount(username);
                 acc.error = null;
                 acc.steamGuardNeeded = false;
                 if (loginSession.accountName) acc.username = loginSession.accountName;
 
+                saveAccountSession(acc.username, loginSession.refreshToken);
+
                 const client = createSteamClientForAccount(acc);
-                client.logOn({
-                    refreshToken: loginSession.refreshToken
-                });
+                client.logOn({ refreshToken: loginSession.refreshToken });
 
                 sessionState.authenticated = true;
-                sessionState.username = username;
+                sessionState.username = acc.username;
             } catch (e) {
-                console.error('QR Login işlenirken hata:', e);
+                console.error('QR Login hatası:', e);
                 sessionState.error = e.message;
             }
         });
 
         loginSession.on('timeout', () => {
-            sessionState.error = 'QR Kod zaman aşımına uğradı. Yeniden kod oluşturun.';
+            sessionState.error = 'QR Kod zaman aşımına uğradı. Yeniden oluşturun.';
         });
 
         loginSession.on('error', (err) => {
@@ -579,7 +387,8 @@ app.post('/api/account/qr-start', async (req, res) => {
     }
 });
 
-app.get('/api/account/qr-status', (req, res) => {
+// 4. QR Kod Durumunu Sorgula
+app.get('/api/qr-status', (req, res) => {
     const { qrSessionId } = req.query;
     if (!qrSessionId || !pendingQrSessions.has(qrSessionId)) {
         return res.json({ success: false, error: 'QR Oturumu bulunamadı veya süresi doldu' });
@@ -597,77 +406,20 @@ app.get('/api/account/qr-status', (req, res) => {
     res.json({ success: true, authenticated: false });
 });
 
-app.post('/api/account/steamguard', async (req, res) => {
-    const sessionId = req.headers['x-session-id'] || (req.body && req.body.sid);
-    const { username, code } = req.body || {};
+// 5. Normal Şifre ile Giriş Yap
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
 
-    if (!sessionId || !username || !code) {
-        return res.json({ success: false, error: 'Eksik bilgi' });
+    if (!username || !password) {
+        return res.json({ success: false, error: 'Kullanıcı adı ve şifre gerekli' });
     }
 
-    const key = getAccountKey(sessionId, username);
-    const acc = accounts.get(key);
-
-    if (!acc) {
-        return res.json({ success: false, error: 'Hesap bulunamadı' });
-    }
-
-    const cleanCode = String(code).trim().toUpperCase();
-
-    // 1. Try steam-session submitSteamGuardCode
-    if (acc.loginSession) {
-        try {
-            await acc.loginSession.submitSteamGuardCode(cleanCode);
-            if (acc.loginSession.refreshToken) {
-                acc.steamGuardNeeded = false;
-                const client = createSteamClientForAccount(acc);
-                client.logOn({ refreshToken: acc.loginSession.refreshToken });
-                return res.json({ success: true, username: acc.username });
-            }
-        } catch (err) {
-            console.error(`❌ [${username}] steam-session guard code error:`, err.message);
-            // Fallback to direct client logon if session timed out or was canceled
-        }
-    }
-
-    // 2. Try legacy pendingSteamGuardCallback
-    if (acc.pendingSteamGuardCallback) {
-        acc.steamGuardNeeded = false;
-        acc.pendingSteamGuardCallback(cleanCode);
-        acc.pendingSteamGuardCallback = null;
-
-        let responded = false;
-        const sendResponse = (payload) => {
-            if (responded || res.headersSent) return;
-            responded = true;
-            clearTimeout(timeout);
-            clearInterval(checkInterval);
-            res.json(payload);
-        };
-
-        const timeout = setTimeout(() => {
-            if (acc.loggedIn) {
-                sendResponse({ success: true, username: acc.username });
-            } else {
-                sendResponse({ success: false, error: acc.error || 'Giriş başarısız' });
-            }
-        }, 8000);
-
-        const checkInterval = setInterval(() => {
-            if (acc.loggedIn || acc.error) {
-                if (acc.loggedIn) {
-                    sendResponse({ success: true, username: acc.username });
-                } else {
-                    sendResponse({ success: false, error: acc.error });
-                }
-            }
-        }, 500);
-        return;
-    }
-
-    // 3. Fallback direct client logOn with authCode & twoFactorCode
-    const client = createSteamClientForAccount(acc);
+    const acc = getOrCreateAccount(username);
+    acc.error = null;
     acc.steamGuardNeeded = false;
+    acc.pendingSteamGuardCallback = null;
+
+    const client = createSteamClientForAccount(acc);
 
     let responded = false;
     const sendResponse = (payload) => {
@@ -682,180 +434,195 @@ app.post('/api/account/steamguard', async (req, res) => {
         sendResponse({ success: true, username: acc.username });
     });
 
+    client.once('steamGuard', (domain, callback) => {
+        acc.steamGuardNeeded = true;
+        acc.steamGuardType = domain ? 'email' : 'app';
+        acc.pendingSteamGuardCallback = callback;
+        sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
+    });
+
     client.once('error', (err) => {
-        sendResponse({ success: false, error: getSteamErrorMessage(err) });
+        acc.error = getSteamErrorMessage(err);
+        sendResponse({ success: false, error: acc.error });
     });
 
     client.logOn({
-        accountName: acc.username,
-        authCode: cleanCode,
-        twoFactorCode: cleanCode
+        accountName: username,
+        password: password
     });
 
     const timeout = setTimeout(() => {
-        if (acc.loggedIn) {
+        if (acc.steamGuardNeeded) {
+            sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
+        } else if (acc.error) {
+            sendResponse({ success: false, error: acc.error });
+        } else if (acc.loggedIn) {
             sendResponse({ success: true, username: acc.username });
         } else {
-            sendResponse({ success: false, error: acc.error || 'Steam Guard kodunun süresi dolmuş olabilir. Lütfen şifrenizle tekrar giriş deneyin.' });
+            sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı' });
         }
-    }, 8000);
+    }, 10000);
 
     const checkInterval = setInterval(() => {
-        if (acc.loggedIn || acc.error) {
-            if (acc.loggedIn) {
-                sendResponse({ success: true, username: acc.username });
-            } else {
+        if (acc.loggedIn || acc.error || acc.steamGuardNeeded) {
+            if (acc.steamGuardNeeded) {
+                sendResponse({ success: false, steamGuard: true, type: acc.steamGuardType, username: acc.username });
+            } else if (acc.error) {
                 sendResponse({ success: false, error: acc.error });
+            } else if (acc.loggedIn) {
+                sendResponse({ success: true, username: acc.username });
             }
         }
     }, 300);
 });
 
-app.post('/api/account/nickname', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
-    const { username, nickname } = req.body;
+// 6. Steam Guard Doğrula
+app.post('/api/steamguard', (req, res) => {
+    const { username, code } = req.body;
 
-    if (!sessionId || !username) {
-        return res.json({ success: false, error: 'Oturum ve kullanıcı adı gerekli' });
-    }
-
-    const key = getAccountKey(sessionId, username);
-    const acc = accounts.get(key);
-    if (acc) {
-        acc.nickname = nickname ? sanitizeInput(nickname).substring(0, 30) : null;
-        return res.json({ success: true, nickname: acc.nickname });
-    }
-    res.json({ success: false, error: 'Hesap bulunamadı' });
-});
-
-app.post('/api/account/personastate', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
-    const { username, personaState } = req.body;
-
-    if (!sessionId || !username || personaState === undefined) {
-        return res.json({ success: false, error: 'Eksik parametre' });
-    }
-
-    const key = getAccountKey(sessionId, username);
-    const acc = accounts.get(key);
-    if (acc && acc.client && acc.loggedIn) {
-        const pState = Math.min(Math.max(Number(personaState) || 1, 0), 7);
-        acc.personaState = pState;
-        try {
-            acc.client.setPersona(pState);
-            return res.json({ success: true, personaState: acc.personaState });
-        } catch (e) {
-            return res.json({ success: false, error: e.message });
-        }
-    }
-    res.json({ success: false, error: 'Hesap çevrimiçi değil' });
-});
-
-app.post('/api/session/idle-all', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
-    const { appIds } = req.body;
-
-    if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
-
-    const keys = sessionAccounts.get(sessionId) || new Set();
-    const ids = (appIds && Array.isArray(appIds) && appIds.length > 0)
-        ? appIds.slice(0, 32).map(id => Math.abs(parseInt(id) || 730))
-        : [730];
-
-    let startedCount = 0;
-    for (const key of keys) {
-        const acc = accounts.get(key);
-        if (acc && acc.loggedIn && acc.client) {
-            try {
-                acc.client.gamesPlayed(ids);
-                acc.games = ids;
-                acc.startTime = Date.now();
-                startedCount++;
-            } catch (e) {}
+    let targetAcc = null;
+    if (username) {
+        targetAcc = accounts.get(String(username).toLowerCase().trim());
+    } else {
+        for (const acc of accounts.values()) {
+            if (acc.steamGuardNeeded && acc.pendingSteamGuardCallback) {
+                targetAcc = acc;
+                break;
+            }
         }
     }
 
-    res.json({ success: true, count: startedCount, games: ids });
-});
-
-app.post('/api/session/stop-all', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
-    if (!sessionId) return res.json({ success: false, error: 'Oturum ID gerekli' });
-
-    const keys = sessionAccounts.get(sessionId) || new Set();
-    let stoppedCount = 0;
-    for (const key of keys) {
-        const acc = accounts.get(key);
-        if (acc && acc.loggedIn && acc.client) {
-            try {
-                acc.client.gamesPlayed([]);
-                acc.games = [];
-                stoppedCount++;
-            } catch (e) {}
-        }
+    if (!targetAcc || !code || !targetAcc.pendingSteamGuardCallback) {
+        return res.json({ success: false, error: 'Geçersiz kod veya bekleyen guard oturumu yok' });
     }
 
-    res.json({ success: true, count: stoppedCount });
+    targetAcc.steamGuardNeeded = false;
+    targetAcc.pendingSteamGuardCallback(String(code).trim().toUpperCase());
+    targetAcc.pendingSteamGuardCallback = null;
+
+    const timeout = setTimeout(() => {
+        if (targetAcc.loggedIn) {
+            res.json({ success: true, username: targetAcc.username });
+        } else {
+            res.json({ success: false, error: targetAcc.error || 'Giriş başarısız' });
+        }
+    }, 8000);
+
+    const checkInterval = setInterval(() => {
+        if (targetAcc.loggedIn || targetAcc.error) {
+            clearTimeout(timeout);
+            clearInterval(checkInterval);
+            if (targetAcc.loggedIn) {
+                res.json({ success: true, username: targetAcc.username });
+            } else {
+                res.json({ success: false, error: targetAcc.error });
+            }
+        }
+    }, 300);
 });
 
-app.post('/api/account/idle', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
+// 7. Tek bir hesapta oyun idle başlat
+app.post('/api/idle', (req, res) => {
     const { username, appIds } = req.body;
 
-    if (!sessionId || !username) {
-        return res.json({ success: false, error: 'Oturum ve kullanıcı adı gerekli' });
-    }
-
-    const key = getAccountKey(sessionId, username);
-    const acc = accounts.get(key);
-
-    if (!acc) {
-        return res.json({ success: false, error: 'Hesap bulunamadı, önce giriş yapın' });
-    }
-
-    if (!appIds || !Array.isArray(appIds) || appIds.length === 0) {
-        return res.json({ success: false, error: 'En az bir oyun seçin' });
-    }
-
-    const ids = appIds.slice(0, 32).map(id => Math.abs(parseInt(id) || 730));
-    acc.games = ids;
-    acc.startTime = Date.now();
-
-    if (acc.client && acc.loggedIn) {
-        try {
-            acc.client.gamesPlayed(ids);
-            console.log(`🎮 [${username}] ${ids.length} oyun için idle başlatıldı: ${ids.join(', ')}`);
-        } catch (err) {
-            console.error(`[${username}] gamesPlayed hatası:`, err.message);
-        }
+    let acc = null;
+    if (username) {
+        acc = accounts.get(String(username).toLowerCase().trim());
     } else {
-        console.log(`⏳ [${username}] Steam bağlantısı bekleniyor, bağlandığında idle otomatik başlayacak: ${ids.join(', ')}`);
+        acc = accounts.values().next().value;
     }
 
-    res.json({ success: true, games: ids });
+    if (!acc || !acc.loggedIn || !acc.client) {
+        return res.json({ success: false, error: 'Önce geçerli bir hesapla giriş yap' });
+    }
+
+    let ids = [];
+    if (appIds && Array.isArray(appIds) && appIds.length > 0) {
+        ids = appIds.slice(0, 32).map(Number);
+    } else {
+        ids = [730]; // Varsayılan CS2
+    }
+
+    try {
+        try {
+            acc.client.setPersona(SteamUser.EPersonaState.Online);
+        } catch (e) {}
+
+        acc.client.gamesPlayed(ids, true);
+        acc.games = ids;
+        acc.startTime = Date.now();
+        console.log(`🎮 [${acc.username}] Idle başlatıldı: ${ids.join(', ')}`);
+        res.json({ success: true, games: ids, username: acc.username });
+    } catch (err) {
+        res.json({ success: false, error: err.message });
+    }
 });
 
-app.post('/api/account/stop', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
+// 8. Tek bir hesapta idle durdur
+app.post('/api/stop', (req, res) => {
     const { username } = req.body;
 
-    if (sessionId && username) {
-        const key = getAccountKey(sessionId, username);
-        const acc = accounts.get(key);
-        if (acc && acc.client && acc.loggedIn) {
-            acc.client.gamesPlayed([]);
-            acc.games = [];
-        }
+    let acc = null;
+    if (username) {
+        acc = accounts.get(String(username).toLowerCase().trim());
+    } else {
+        acc = accounts.values().next().value;
+    }
+
+    if (acc && acc.client && acc.loggedIn) {
+        acc.client.gamesPlayed([]);
+        acc.games = [];
+        acc.startTime = null;
+        console.log(`⏹ [${acc.username}] Idle durduruldu`);
     }
     res.json({ success: true });
 });
 
-app.post('/api/account/logout', (req, res) => {
-    const sessionId = req.headers['x-session-id'] || req.body.sid;
-    const { username } = req.body;
+// 9. Tüm hesaplarda idle başlat
+app.post('/api/idle-all', (req, res) => {
+    const { appIds } = req.body;
+    const ids = (appIds && Array.isArray(appIds) && appIds.length > 0)
+        ? appIds.slice(0, 32).map(Number)
+        : [730];
 
-    if (sessionId && username) {
-        const key = getAccountKey(sessionId, username);
+    let count = 0;
+    for (const acc of accounts.values()) {
+        if (acc.loggedIn && acc.client) {
+            try {
+                try {
+                    acc.client.setPersona(SteamUser.EPersonaState.Online);
+                } catch (e) {}
+                acc.client.gamesPlayed(ids, true);
+                acc.games = ids;
+                acc.startTime = Date.now();
+                count++;
+            } catch (e) {}
+        }
+    }
+    res.json({ success: true, count, games: ids });
+});
+
+// 10. Tüm hesaplarda idle durdur
+app.post('/api/stop-all', (req, res) => {
+    let count = 0;
+    for (const acc of accounts.values()) {
+        if (acc.loggedIn && acc.client) {
+            try {
+                acc.client.gamesPlayed([]);
+                acc.games = [];
+                acc.startTime = null;
+                count++;
+            } catch (e) {}
+        }
+    }
+    res.json({ success: true, count });
+});
+
+// 11. Hesabı Çıkart / Kaldır
+app.post('/api/logout', (req, res) => {
+    const { username } = req.body;
+    if (username) {
+        const key = String(username).toLowerCase().trim();
         const acc = accounts.get(key);
         if (acc) {
             if (acc.client) {
@@ -865,27 +632,16 @@ app.post('/api/account/logout', (req, res) => {
                 } catch (e) {}
             }
             accounts.delete(key);
-            if (sessionAccounts.has(sessionId)) {
-                sessionAccounts.get(sessionId).delete(key);
-            }
+            removeAccountSession(acc.username);
+            console.log(`👋 [${acc.username}] Hesabı kaldırıldı`);
         }
     }
-    res.json({ success: true });
+    res.json({ success: true, accountsCount: accounts.size });
 });
 
+// 12. Popüler Oyunlar Listesi
 app.get('/api/games', (req, res) => {
     res.json(POPULAR_GAMES);
-});
-
-// 404 Handler
-app.use((req, res) => {
-    res.status(404).json({ success: false, error: 'Bulunamadı (404)' });
-});
-
-// Global Error Handler (Sistem Çökmesini Önleme)
-app.use((err, req, res, next) => {
-    console.error('⚠️ Sunucu içi işlenmemiş hata:', err.stack);
-    res.status(500).json({ success: false, error: 'Sunucu içi bir hata oluştu.' });
 });
 
 // ============================================================
@@ -894,14 +650,14 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`
-╔══════════════════════════════════════════════════════════╗
-║ 🛡️ STEAM IDLE PRO - ÜST DÜZEY GÜVENLİ SERVER HARDENED   ║
-║ http://localhost:${PORT}                                   ║
-║                                                          ║
-║ 🛡️ Helmet CSP, XSS, Clickjacking, MIME Sniffing aktif    ║
-║ 🛡️ Rate Limiting (DDoS & Brute Force koruması) aktif     ║
-║ 🛡️ Input Sanitization & Anti-Injection koruması aktif     ║
-║ 🛡️ Anti-Payload Bomb & Memory Leak protection aktif       ║
-╚══════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════╗
+║     🎮 STEAM IDLE PRO - ÇOKLU HESAP + QR KOD AKTİF   ║
+║     http://localhost:${PORT}                           ║
+║                                                      ║
+║     📱 Steam Mobil QR Tarama Hazır                   ║
+║     👥 Sınırsız Çoklu Hesap Ekleme Hazır             ║
+║     ⚡ PC Kapalıyken de Saat Kasmaya Devam Eder!     ║
+╚══════════════════════════════════════════════════════╝
     `);
+    loadSavedSessions();
 });
