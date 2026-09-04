@@ -15,45 +15,41 @@ const app = express();
 // 1. Sunucu Bilgisini Gizle (Anti-Fingerprinting)
 app.disable('x-powered-by');
 
-// 2. HTTP Güvenlik Başlıkları (Helmet CSP, XSS, Clickjacking, Anti-Sniffing)
+// 2. CORS & HTTP Güvenlik Başlıkları
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-id, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://fonts.googleapis.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "https://*.steamstatic.com", "https://*.steampowered.com"],
-            connectSrc: ["'self'"]
-        }
-    },
+    contentSecurityPolicy: false, // CSP kısıtlamaları yerel testlerde engel çıkarmasın
     crossOriginEmbedderPolicy: false,
-    frameguard: { action: 'deny' }, // Anti-Clickjacking
-    noSniff: true,                   // Anti-MIME Sniffing
-    xssFilter: true                  // Anti-XSS Injection
+    frameguard: false
 }));
 
-app.use(express.json({ limit: '10kb' })); // Anti-Payload Bomb (Maksimum 10KB JSON isteği)
+app.use(express.json({ limit: '10kb' })); // Anti-Payload Bomb
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 3. Rate Limiting (DDoS & Brute Force Saldırı Koruması)
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 dakika
-    max: 2000,                 // IP başına 15 dakikada 2000 istek (Canlı polling desteği)
+    windowMs: 15 * 60 * 1000,
+    max: 10000,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path.includes('/status') || req.path.includes('/accounts'),
-    message: { success: false, error: 'Çok fazla istek yapıldı, lütfen biraz bekleyin (DDoS Koruması).' }
+    skip: (req) => req.path.includes('/status') || req.path.includes('/accounts')
 });
 app.use('/api/', globalLimiter);
 
-// Sıkı Giriş Sınırlaması (Brute-Force / Şifre Deneme Koruması)
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 dakika
-    max: 30,                  // IP başına 15 dakikada maks 30 şifre denemesi
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
     standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, error: 'Çok fazla hatalı giriş denemesi yapıldı. Güvenlik nedeniyle 15 dakika bekleyin.' }
+    legacyHeaders: false
 });
 app.use('/api/account/login', loginLimiter);
 app.use('/api/account/steamguard', loginLimiter);

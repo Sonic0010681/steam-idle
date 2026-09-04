@@ -739,9 +739,20 @@
             options.headers = options.headers || {};
             options.headers['x-session-id'] = sessionId;
             options.headers['Content-Type'] = 'application/json';
-            const targetUrl = url.startsWith('http') ? url : (API_BASE + url);
-            const res = await fetch(targetUrl, options);
-            return await res.json();
+
+            let base = API_BASE;
+            if (window.location.protocol && window.location.protocol.startsWith('http')) {
+                base = window.location.origin;
+            }
+            const targetUrl = url.startsWith('http') ? url : (base + url);
+
+            try {
+                const res = await fetch(targetUrl, options);
+                return await res.json();
+            } catch (e) {
+                console.error('API Fetch Hatası:', e);
+                return { success: false, error: 'Sunucuya bağlanılamadı. Lütfen sunucunun açık olduğundan ve http://localhost:5000 adresini açtığınızdan emin olun.' };
+            }
         }
 
         // ============================================================
