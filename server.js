@@ -76,8 +76,8 @@ function sanitizeInput(input) {
 
 app.use((req, res, next) => {
     if (req.body && typeof req.body === 'object') {
-        // Prototype Pollution Koruması (__proto__, constructor engelleme)
-        if (req.body.__proto__ || req.body.constructor?.prototype) {
+        // Prototype Pollution Koruması (__proto__ veya constructor tahrifatını engelleme)
+        if (Object.prototype.hasOwnProperty.call(req.body, '__proto__') || Object.prototype.hasOwnProperty.call(req.body, 'constructor')) {
             return res.status(400).json({ success: false, error: 'Geçersiz veri yapısı' });
         }
         for (const key in req.body) {
