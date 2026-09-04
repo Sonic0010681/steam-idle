@@ -39,9 +39,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 3. Rate Limiting (DDoS & Brute Force Saldırı Koruması)
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 dakika
-    max: 200,                  // IP başına maks 200 istek
+    max: 2000,                 // IP başına 15 dakikada 2000 istek (Canlı polling desteği)
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.path.includes('/status') || req.path.includes('/accounts'),
     message: { success: false, error: 'Çok fazla istek yapıldı, lütfen biraz bekleyin (DDoS Koruması).' }
 });
 app.use('/api/', globalLimiter);
@@ -49,14 +50,13 @@ app.use('/api/', globalLimiter);
 // Sıkı Giriş Sınırlaması (Brute-Force / Şifre Deneme Koruması)
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 dakika
-    max: 12,                  // IP başına 15 dakikada maks 12 giriş denemesi
+    max: 30,                  // IP başına 15 dakikada maks 30 şifre denemesi
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, error: 'Çok fazla hatalı giriş denemesi yapıldı. Güvenlik nedeniyle 15 dakika bekleyin.' }
 });
 app.use('/api/account/login', loginLimiter);
 app.use('/api/account/steamguard', loginLimiter);
-app.use('/api/account/qr-start', loginLimiter);
 
 // 4. Input Sanitization & Anti-Injection Middleware (XSS, SQLi, Prototype Pollution Koruması)
 function sanitizeInput(input) {

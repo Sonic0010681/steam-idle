@@ -485,7 +485,10 @@
             </div>
 
             <button class="btn-add-full" onclick="showAddAccountView()">
-                <span>+</span> YENİ HESAP EKLE
+                <span>+</span> ŞİFRE İLE HESAP EKLE
+            </button>
+            <button class="btn-add-full" style="background: rgba(139, 92, 246, 0.12); border-color: var(--neon-secondary); color: var(--neon-secondary);" onclick="showQrAddAccountView()">
+                <span>📱</span> MOBİL QR İLE HESAP EKLE
             </button>
         </aside>
 
@@ -864,6 +867,14 @@
             renderSidebar();
             showView('addAccountView');
             switchLoginMode('password');
+            document.getElementById('loginErrorMsg').innerHTML = '';
+        }
+
+        function showQrAddAccountView() {
+            activeUsername = null;
+            renderSidebar();
+            showView('addAccountView');
+            switchLoginMode('qr');
             document.getElementById('loginErrorMsg').innerHTML = '';
         }
 
