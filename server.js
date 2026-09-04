@@ -419,7 +419,6 @@ app.post('/api/qr-start', async (req, res) => {
                 acc.steamGuardNeeded = false;
                 if (loginSession.accountName) acc.username = loginSession.accountName;
 
-                saveAccountSession(acc.username, loginSession.refreshToken);
                 acc.refreshToken = loginSession.refreshToken;
 
                 const client = createSteamClientForAccount(acc);
@@ -427,6 +426,7 @@ app.post('/api/qr-start', async (req, res) => {
 
                 sessionState.authenticated = true;
                 sessionState.username = acc.username;
+                sessionState.refreshToken = loginSession.refreshToken;
             } catch (e) {
                 console.error('QR Login hatası:', e);
                 sessionState.error = e.message;
@@ -457,7 +457,7 @@ app.get('/api/qr-status', (req, res) => {
     const state = pendingQrSessions.get(qrSessionId);
     if (state.authenticated) {
         pendingQrSessions.delete(qrSessionId);
-        return res.json({ success: true, authenticated: true, username: state.username });
+        return res.json({ success: true, authenticated: true, username: state.username, refreshToken: state.refreshToken });
     } else if (state.error) {
         pendingQrSessions.delete(qrSessionId);
         return res.json({ success: false, error: state.error });
@@ -491,7 +491,7 @@ app.post('/api/login', (req, res) => {
     };
 
     client.once('loggedOn', () => {
-        sendResponse({ success: true, username: acc.username });
+        sendResponse({ success: true, username: acc.username, refreshToken: acc.refreshToken });
     });
 
     client.once('steamGuard', (domain, callback) => {
@@ -518,7 +518,7 @@ app.post('/api/login', (req, res) => {
         } else if (acc.error) {
             sendResponse({ success: false, error: acc.error });
         } else if (acc.loggedIn) {
-            sendResponse({ success: true, username: acc.username });
+            sendResponse({ success: true, username: acc.username, refreshToken: acc.refreshToken });
         } else {
             sendResponse({ success: false, error: 'Bağlantı zaman aşımına uğradı' });
         }
@@ -531,7 +531,7 @@ app.post('/api/login', (req, res) => {
             } else if (acc.error) {
                 sendResponse({ success: false, error: acc.error });
             } else if (acc.loggedIn) {
-                sendResponse({ success: true, username: acc.username });
+                sendResponse({ success: true, username: acc.username, refreshToken: acc.refreshToken });
             }
         }
     }, 300);

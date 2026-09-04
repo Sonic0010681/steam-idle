@@ -692,6 +692,9 @@
                             if (cData.authenticated) {
                                 clearInterval(qrPollingInterval);
                                 clearInterval(qrCountdownInterval);
+                                if (cData.username) {
+                                    saveClientAccountSession(cData.username, cData.refreshToken || 'active');
+                                }
                                 if (qrStatusMsg) {
                                     qrStatusMsg.innerHTML = '<span style="color: var(--green); font-weight: 700;">✅ QR Başarıyla Tarandı! Giriş Yapılıyor...</span>';
                                 }
