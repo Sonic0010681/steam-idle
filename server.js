@@ -73,6 +73,11 @@ const POPULAR_GAMES = [
     { appId: 230410, name: 'Warframe' },
     { appId: 440900, name: 'Conan Exiles' },
     { appId: 739630, name: 'Phasmophobia' },
+    { appId: 227300, name: 'Euro Truck Simulator 2' },
+    { appId: 239140, name: 'Dying Light' },
+    { appId: 242760, name: 'The Forest' },
+    { appId: 244210, name: 'Assetto Corsa' },
+    { appId: 107410, name: 'Arma 3' },
 ];
 
 function getOrCreateAccount(rawUsername) {
@@ -91,6 +96,8 @@ function getOrCreateAccount(rawUsername) {
         loggedIn: false,
         games: [],
         ownedGames: [],
+        playingBlocked: false,
+        blockedByApp: null,
         steamGuardNeeded: false,
         steamGuardType: null,
         pendingSteamGuardCallback: null,
@@ -102,6 +109,46 @@ function getOrCreateAccount(rawUsername) {
 
     accounts.set(key, acc);
     return acc;
+}
+
+function fetchAllOwnedGames(acc) {
+    if (!acc.client || !acc.loggedIn || !acc.steamID) return;
+    try {
+        acc.client.getUserOwnedApps(acc.steamID, {
+            includeAppInfo: true,
+            includePlayedFreeGames: true,
+            includeFreeSub: true,
+            skipUnvettedApps: false
+        }, (err, res) => {
+            if (err) {
+                console.log(`⚠️ [${acc.username}] Kütüphane oyunları alınamadı:`, err.message);
+                return;
+            }
+            if (res && res.apps && res.apps.length > 0) {
+                console.log(`📦 [${acc.username}] ${res.apps.length} adet Steam kütüphane oyunu başarıyla yüklendi!`);
+                const games = res.apps
+                    .filter(a => a.name && a.appid)
+                    .map(a => ({
+                        appId: a.appid,
+                        name: a.name,
+                        playtime: Math.round((a.playtime_forever || 0) / 60),
+                        icon: a.img_icon_url || null
+                    }))
+                    .sort((a, b) => b.playtime - a.playtime); // En çok oynananlar en başta
+
+                // Popüler oyunları da ekle (listede yoksa)
+                POPULAR_GAMES.forEach(pop => {
+                    if (!games.some(g => g.appId === pop.appId)) {
+                        games.push({ appId: pop.appId, name: pop.name, playtime: 0, icon: null });
+                    }
+                });
+
+                acc.ownedGames = games;
+            }
+        });
+    } catch (e) {
+        console.error('Kütüphane getirme hatası:', e.message);
+    }
 }
 
 function createSteamClientForAccount(acc) {
@@ -128,9 +175,13 @@ function createSteamClientForAccount(acc) {
             client.setPersona(SteamUser.EPersonaState.Online);
         } catch (e) {}
 
+        // Kütüphanedeki tüm oyunları isimleri ve süreleriyle çek
+        fetchAllOwnedGames(acc);
+        setTimeout(() => fetchAllOwnedGames(acc), 3500);
+
         if (acc.games && acc.games.length > 0) {
             acc.startTime = Date.now();
-            try { client.gamesPlayed(acc.games, true); } catch (e) {}
+            try { client.gamesPlayed(acc.games, false); } catch (e) {}
         } else {
             acc.startTime = null;
         }
@@ -145,8 +196,23 @@ function createSteamClientForAccount(acc) {
         saveAccountSession(acc.username, token);
     });
 
+    // Akıllı Oyun Durumu Takibi (Sen oyuna girince bot seni kicklemez, duraklar; oyundan çıkınca devam eder!)
     client.on('playingState', (blocked, playingApp) => {
-        console.log(`🎮 [${acc.username}] Oynama durumu: blocked=${blocked}, playingApp=${playingApp}`);
+        console.log(`🎮 [${acc.username}] Oynama durumu güncellendi: blocked=${blocked}, playingApp=${playingApp}`);
+        acc.playingBlocked = !!blocked;
+        acc.blockedByApp = playingApp || null;
+
+        if (blocked) {
+            console.log(`⏸️ [${acc.username}] PC'de oyun tespit edildi (AppID: ${playingApp}). Oyununu kesmemek için bot akıllı beklemeye geçti.`);
+        } else {
+            console.log(`▶️ [${acc.username}] PC'deki oyun bitti! Bot saat kasmaya otomatik olarak devam ediyor.`);
+            if (acc.games && acc.games.length > 0 && acc.loggedIn && acc.client) {
+                try {
+                    acc.client.gamesPlayed(acc.games, false);
+                    acc.startTime = Date.now();
+                } catch (e) {}
+            }
+        }
     });
 
     client.on('appLaunched', (appid) => {
@@ -158,22 +224,7 @@ function createSteamClientForAccount(acc) {
     });
 
     client.on('ownershipCached', () => {
-        try {
-            const ownedAppIds = client.getOwnedApps() || [];
-            console.log(`📦 [${acc.username}] ${ownedAppIds.length} adet lisans/oyun tespit edildi.`);
-            const list = [];
-            ownedAppIds.forEach(appId => {
-                const idNum = Number(appId);
-                const pop = POPULAR_GAMES.find(g => g.appId === idNum);
-                let name = pop ? pop.name : null;
-                if (!name && client.picsCache && client.picsCache.apps && client.picsCache.apps[idNum]) {
-                    const info = client.picsCache.apps[idNum].appinfo;
-                    if (info && info.common && info.common.name) name = info.common.name;
-                }
-                list.push({ appId: idNum, name: name || `Oyun #${idNum}` });
-            });
-            acc.ownedGames = list;
-        } catch (e) {}
+        fetchAllOwnedGames(acc);
     });
 
     client.on('steamGuard', (domain, callback) => {
@@ -186,16 +237,29 @@ function createSteamClientForAccount(acc) {
     client.on('error', (err) => {
         console.error(`❌ [${acc.username}] Steam hatası:`, err.message);
         acc.loggedIn = false;
-        acc.games = [];
-        acc.startTime = null;
         acc.error = getSteamErrorMessage(err);
+
+        // Oturum değiştiğinde veya bağlantı koptuğunda arka planda otomatik yeniden bağlan
+        if (acc.refreshToken && (err.message.includes('LogonSessionReplaced') || err.message.includes('NoConnection') || err.eresult === 34 || err.eresult === 3)) {
+            console.log(`🔄 [${acc.username}] 8 saniye içinde otomatik yeniden bağlanacak...`);
+            setTimeout(() => {
+                if (!acc.loggedIn && acc.refreshToken && acc.client) {
+                    try { acc.client.logOn({ refreshToken: acc.refreshToken }); } catch (e) {}
+                }
+            }, 8000);
+        }
     });
 
     client.on('disconnected', (eresult, msg) => {
         console.log(`🔌 [${acc.username}] Steam bağlantısı kesildi:`, msg);
         acc.loggedIn = false;
-        acc.games = [];
-        acc.startTime = null;
+        if (acc.refreshToken) {
+            setTimeout(() => {
+                if (!acc.loggedIn && acc.refreshToken && acc.client) {
+                    try { acc.client.logOn({ refreshToken: acc.refreshToken }); } catch (e) {}
+                }
+            }, 6000);
+        }
     });
 
     return client;
@@ -216,7 +280,7 @@ function getSteamErrorMessage(err) {
 // Sayaç & Bellek temizleyici (Saniyede bir)
 setInterval(() => {
     for (const acc of accounts.values()) {
-        if (acc.loggedIn && acc.games && acc.games.length > 0) {
+        if (acc.loggedIn && acc.games && acc.games.length > 0 && !acc.playingBlocked) {
             acc.totalSeconds = (acc.totalSeconds || 0) + 1;
         }
     }
@@ -262,6 +326,8 @@ app.get('/api/accounts', (req, res) => {
             persona: acc.persona || acc.username,
             steamID: acc.steamID,
             loggedIn: acc.loggedIn,
+            playingBlocked: acc.playingBlocked || false,
+            blockedByApp: acc.blockedByApp || null,
             steamGuardNeeded: acc.steamGuardNeeded,
             steamGuardType: acc.steamGuardType,
             games: acc.games || [],
@@ -291,6 +357,8 @@ app.get('/api/status', (req, res) => {
             username: first.username,
             persona: first.persona || first.username,
             steamID: first.steamID,
+            playingBlocked: first.playingBlocked || false,
+            blockedByApp: first.blockedByApp || null,
             games: first.games || [],
             ownedGames: (first.ownedGames && first.ownedGames.length > 0) ? first.ownedGames : POPULAR_GAMES,
             steamGuardNeeded: first.steamGuardNeeded,
@@ -317,6 +385,8 @@ app.get('/api/status', (req, res) => {
         username: acc.username,
         persona: acc.persona || acc.username,
         steamID: acc.steamID,
+        playingBlocked: acc.playingBlocked || false,
+        blockedByApp: acc.blockedByApp || null,
         games: acc.games || [],
         ownedGames: (acc.ownedGames && acc.ownedGames.length > 0) ? acc.ownedGames : POPULAR_GAMES,
         steamGuardNeeded: acc.steamGuardNeeded,
@@ -548,7 +618,8 @@ app.post('/api/idle', (req, res) => {
             acc.client.setPersona(SteamUser.EPersonaState.Online);
         } catch (e) {}
 
-        acc.client.gamesPlayed(ids, true);
+        // force: false veriyoruz ki kullanıcının kendi PC'sindeki oyununu kicklemesin!
+        acc.client.gamesPlayed(ids, false);
         acc.games = ids;
         acc.startTime = Date.now();
         console.log(`🎮 [${acc.username}] Idle başlatıldı: ${ids.join(', ')}`);
@@ -592,7 +663,7 @@ app.post('/api/idle-all', (req, res) => {
                 try {
                     acc.client.setPersona(SteamUser.EPersonaState.Online);
                 } catch (e) {}
-                acc.client.gamesPlayed(ids, true);
+                acc.client.gamesPlayed(ids, false);
                 acc.games = ids;
                 acc.startTime = Date.now();
                 count++;

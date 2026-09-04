@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steam Idle Pro - Saat Kasma (Çoklu Hesap & QR Giriş)</title>
+    <title>Steam Idle Pro - Saat Kasma (Tüm Kütüphane & QR Giriş)</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -49,7 +49,7 @@
 
         .container {
             position: relative; z-index: 1;
-            max-width: 840px; margin: 0 auto; padding: 24px 18px;
+            max-width: 860px; margin: 0 auto; padding: 24px 18px;
         }
 
         /* Header */
@@ -289,8 +289,8 @@
 
         /* Games grid */
         .games-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-            gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px; margin-bottom: 14px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 8px; max-height: 360px; overflow-y: auto; padding-right: 4px; margin-bottom: 14px;
         }
 
         .games-grid::-webkit-scrollbar { width: 4px; }
@@ -322,8 +322,9 @@
 
         .game-item.selected .game-check::after { content: '✓'; }
 
-        .game-label { font-size: 0.82rem; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .game-id { font-size: 0.7rem; color: var(--text2); font-family: 'Orbitron', monospace; }
+        .game-label { font-size: 0.82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .game-sub { font-size: 0.7rem; color: var(--text2); }
+        .game-id { font-size: 0.7rem; color: var(--text2); font-family: 'Orbitron', monospace; margin-left: auto; flex-shrink: 0; }
 
         /* Custom App ID input */
         .custom-appid {
@@ -413,7 +414,7 @@
                 <div class="logo-icon">🎮</div>
                 <h1>STEAM IDLE PRO</h1>
             </div>
-            <p>Çoklu Hesap • Steam Mobil QR Kod Girişi • 7/24 Kesintisiz Saat Kasma</p>
+            <p>Çoklu Hesap • Tüm Steam Kütüphanesi • Akıllı Kesintisiz Saat Kasma</p>
         </div>
 
         <!-- MASTER CONTROLS BAR (Hesaplar varsa görünür) -->
@@ -569,7 +570,7 @@
                         </a>
                     </div>
                     <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.08); font-size: 0.75rem; color: #94a3b8; line-height: 1.5;">
-                        ⚡ <strong>Steam Saat Mantığı:</strong> Steam profilindeki toplam saat sayacı saniye saniye değil, yaklaşık <strong>her 20-30 dakikada bir</strong> Steam sunucuları tarafından toplu artırılır. Profil linkine tıkladığında yeşil renkte <em>"Şu Anda Oyunda: Counter-Strike 2"</em> yazıyorsa saatlerin Steam tarafından sorunsuz sayılıyor demektir!
+                        ⚡ <strong>Akıllı Oyun & Saat Koruması:</strong> Bilgisayarında normal oyun oynarken bot senin oyununu kesmez; oyundan çıktığında ise saniyesinde saat kasmaya otomatik devam eder! Steam profilindeki toplam saat sayacı yaklaşık <strong>her 20-30 dakikada bir</strong> toplu artırılır. Profil linkine tıkladığında yeşil "Oyunda" görünüyorsan saatlerin Steam tarafından sorunsuz sayılıyor demektir!
                     </div>
                 </div>
 
@@ -578,10 +579,10 @@
 
             <!-- Game Selection Card -->
             <div class="card">
-                <div class="card-title">🕹️ Oyun Seç (Bu Hesap İçin)</div>
+                <div class="card-title" id="libraryTitle">🕹️ Steam Kütüphanen (Tüm Oyunlar)</div>
 
                 <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                    <input type="text" id="gameSearch" placeholder="🔍 Oyun ara (İsim veya App ID)..." oninput="renderGames(this.value)"
+                    <input type="text" id="gameSearch" placeholder="🔍 Kütüphanende oyun ara (İsim veya App ID)..." oninput="renderGames(this.value)"
                            style="flex: 1; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text); font-size: 0.85rem; outline: none;">
                     <button onclick="clearSelectedGames()" style="padding: 10px 14px; border-radius: 8px; border: none; background: rgba(248,113,113,0.15); color: var(--red); font-size: 0.75rem; font-weight: 600; cursor: pointer;">
                         ✕ Seçimi Temizle
@@ -862,9 +863,11 @@
                         profileLink.style.display = 'none';
                     }
 
-                    // Hesaptaki tespit edilen oyunları yükle
+                    // Hesaptaki tüm kütüphane oyunlarını yükle
                     if (data.ownedGames && data.ownedGames.length > 0) {
                         allGames = data.ownedGames;
+                        const libTitle = document.getElementById('libraryTitle');
+                        if (libTitle) libTitle.textContent = `🕹️ Steam Kütüphanen (${allGames.length} Oyun)`;
                     }
 
                     selectedAppIds.clear();
@@ -896,7 +899,18 @@
 
             const isIdling = data.games && data.games.length > 0;
 
-            if (isIdling) {
+            if (data.playingBlocked) {
+                // KULLANICI PC'DE KENDİ OYUNUNDA!
+                badge.className = 'status-badge online';
+                text.textContent = 'PC\'de Oyundasın (Akıllı Bekleme)';
+                label.textContent = 'PC Oyunu Aktif';
+                count.textContent = data.games.length;
+                uptime.textContent = formatUptime(data.uptime || 0);
+
+                if (liveDot) liveDot.textContent = '⏸️';
+                if (liveTitle) liveTitle.innerHTML = 'PC\'de Oyun Tespit Edildi • <span style="color:var(--orange);">Akıllı Bekleme</span>';
+                if (liveSubTitle) liveSubTitle.textContent = 'Kendi oyununu kesintisiz oyna! Oyundan çıktığın an bot saat kasmaya otomatik devam edecek.';
+            } else if (isIdling) {
                 badge.className = 'status-badge idling';
                 text.textContent = 'Saat Kasılıyor';
                 label.textContent = '🔥 Kasıyor!';
@@ -973,9 +987,15 @@
                 const div = document.createElement('div');
                 div.className = 'game-item' + (isSelected ? ' selected' : '');
                 div.onclick = () => toggleGame(game.appId);
+
+                const playtimeTxt = game.playtime !== undefined && game.playtime > 0 ? `${game.playtime} saat oynandı` : '';
+
                 div.innerHTML = `
                     <div class="game-check"></div>
-                    <span class="game-label">${game.name}</span>
+                    <div style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+                        <span class="game-label">${game.name}</span>
+                        ${playtimeTxt ? `<span class="game-sub">${playtimeTxt}</span>` : ''}
+                    </div>
                     <span class="game-id">${game.appId}</span>
                 `;
                 grid.appendChild(div);
@@ -1136,10 +1156,16 @@
                         if (data.success || data.loggedIn !== undefined) {
                             updateActiveAccountBadge(data);
 
+                            if (data.ownedGames && data.ownedGames.length > allGames.length) {
+                                allGames = data.ownedGames;
+                                renderGames(document.getElementById('gameSearch') ? document.getElementById('gameSearch').value : '');
+                            }
+
                             const accInList = accountsList.find(a => a.username.toLowerCase() === activeUsername.toLowerCase());
                             if (accInList) {
                                 accInList.games = data.games || [];
                                 accInList.loggedIn = data.loggedIn;
+                                accInList.playingBlocked = data.playingBlocked;
                                 updateIdleBtn();
                                 renderAccountsBar();
                             }
