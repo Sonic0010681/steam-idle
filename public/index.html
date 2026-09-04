@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Idle Multi - Saati Kas!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #070a14;
+            --sidebar-bg: rgba(12, 17, 32, 0.85);
+            --card-bg: rgba(18, 26, 47, 0.7);
+            --card-border: rgba(56, 189, 248, 0.15);
+            --neon-blue: #00d2ff;
+            --steam-blue: #1b9fff;
+            --accent-purple: #8b5cf6;
+            --green: #10b981;
+            --green-glow: rgba(16, 185, 129, 0.25);
+            --red: #ef4444;
+            --orange: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background Grids & Glows */
+        .bg-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+            background-image:
+                linear-gradient(rgba(0, 210, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 210, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+        }
+
+        .bg-glow-1 {
+            position: fixed; top: -10%; left: -10%; width: 50vw; height: 50vw; z-index: 0;
+            background: radial-gradient(circle, rgba(0, 210, 255, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .bg-glow-2 {
+            position: fixed; bottom: -10%; right: -10%; width: 50vw; height: 50vw; z-index: 0;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* Main Layout */
+        .app-wrapper {
+            position: relative; z-index: 1;
+            display: flex;
+            flex: 1;
+            min-height: 100vh;
+        }
+
+        /* Sidebar - Account Switcher */
+        .sidebar {
+            width: 320px;
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--card-border);
+            display: flex; flex-direction: column;
+            padding: 24px 18px;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .brand {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 28px; padding: 0 6px;
+        }
+
+        .brand-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--neon-blue), var(--accent-purple));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);
+        }
+
+        .brand-text h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.25rem; font-weight: 900; letter-spacing: 2px;
+            background: linear-gradient(135deg, #fff, var(--neon-blue));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 0.72rem; color: var(--text-muted); font-weight: 500;
+        }
+
+        /* Accounts Section Header */
+        .accounts-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px; padding: 0 6px;
+        }
+
+        .accounts-header span {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.72rem; font-weight: 700; letter-spacing: 2px;
+            color: var(--text-muted); text-transform: uppercase;
+        }
+
+        .btn-add-account {
+            width: 34px; height: 34px; border-radius: 10px;
+            background: rgba(0, 210, 255, 0.12); border: 1px solid rgba(0, 210, 255, 0.3);
+            color: var(--neon-blue); font-size: 1.2rem; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.25s ease;
+        }
+
+        .btn-add-account:hover {
+            background: rgba(0, 210, 255, 0.25);
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .accounts-list {
+            display: flex; flex-direction: column; gap: 10px;
+            overflow-y: auto; flex: 1; padding-right: 4px;
+        }
+
+        .accounts-list::-webkit-scrollbar { width: 4px; }
+        .accounts-list::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.2); border-radius: 4px; }
+
+        /* Account Item Card */
+        .account-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 14px; padding: 14px;
+            display: flex; align-items: center; gap: 12px;
+            cursor: pointer; transition: all 0.25s ease; position: relative;
+        }
+
+        .account-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(0, 210, 255, 0.25);
+        }
+
+        .account-card.active {
+            background: linear-gradient(135deg, rgba(0, 210, 255, 0.12), rgba(139, 92, 246, 0.1));
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
+        }
+
+        .acc-avatar {
+            width: 42px; height: 42px; border-radius: 12px;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 1.1rem; color: var(--neon-blue);
+            position: relative; flex-shrink: 0;
+        }
+
+        .acc-status-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            position: absolute; bottom: -2px; right: -2px;
+            border: 2px solid #0c1120;
+        }
+
+        .acc-status-dot.idling { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulseDot 1.5s infinite; }
+        .acc-status-dot.online { background: var(--neon-blue); }
+        .acc-status-dot.guard { background: var(--orange); }
+        .acc-status-dot.offline { background: var(--red); }
+
+        @keyframes pulseDot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.25); opacity: 0.7; }
+        }
+
+        .acc-info { overflow: hidden; flex: 1; }
+
+        .acc-name {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.85rem; font-weight: 700;
+            color: var(--text-main); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+        }
+
+        .acc-sub {
+            font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;
+            text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+        }
+
+        .btn-add-full {
+            margin-top: 14px; width: 100%; padding: 12px;
+            border-radius: 12px; border: 1px dashed rgba(0, 210, 255, 0.3);
+            background: rgba(0, 210, 255, 0.05); color: var(--neon-blue);
+            font-family: 'Orbitron', monospace; font-size: 0.75rem; font-weight: 700;
+            letter-spacing: 1px; cursor: pointer; transition: all 0.25s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+
+        .btn-add-full:hover {
+            background: rgba(0, 210, 255, 0.15); border-style: solid;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
+        }
+
+        /* Main Content Container */
+        .main-content {
+            flex: 1; padding: 32px 36px;
+            max-width: 960px; margin: 0 auto; width: 100%;
+        }
+
+        /* Cards & Glass Containers */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px; padding: 30px; margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: fadeIn 0.35s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 22px; padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .card-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.95rem; font-weight: 800; letter-spacing: 2px;
+            color: var(--neon-blue); text-transform: uppercase;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        /* Status Badge Top Bar */
+        .account-header-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 16px; margin-bottom: 24px;
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px; padding: 18px 24px;
+        }
+
+        .acc-active-details {
+            display: flex; align-items: center; gap: 14px;
+        }
+
+        .acc-active-avatar {
+            width: 48px; height: 48px; border-radius: 14px;
+            background: linear-gradient(135deg, var(--steam-blue), var(--accent-purple));
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Orbitron', monospace; font-size: 1.3rem; font-weight: 900;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+        }
+
+        .acc-active-title {
+            font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 800;
+            color: #fff;
+        }
+
+        .acc-active-id { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px; padding: 16px; text-align: center;
+        }
+
+        .stat-val {
+            font-family: 'Orbitron', monospace; font-size: 1.25rem; font-weight: 800;
+            color: var(--neon-blue);
+        }
+
+        .stat-lbl {
+            font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 1.5px; margin-top: 4px;
+        }
+
+        /* Form Inputs */
+        .form-group { margin-bottom: 18px; }
+
+        .form-group label {
+            display: block; font-size: 0.8rem; font-weight: 600;
+            color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.5px;
+        }
+
+        .form-group input {
+            width: 100%; padding: 14px 18px; border-radius: 12px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-main); font-size: 0.95rem; outline: none;
+            font-family: 'Inter', sans-serif; transition: all 0.25s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.15);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 14px 28px; border: none; border-radius: 12px;
+            font-family: 'Orbitron', monospace; font-size: 0.85rem; font-weight: 700;
+            letter-spacing: 2px; cursor: pointer; transition: all 0.25s ease;
+            text-transform: uppercase; display: inline-flex; align-items: center;
+            justify-content: center; gap: 8px; width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--steam-blue), var(--neon-blue));
+            color: #fff; box-shadow: 0 6px 20px rgba(0, 210, 255, 0.25);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 210, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.12); color: var(--red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+        }
+
+        /* Games Tab Bar & Filters */
+        .games-tab-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+        }
+
+        .tabs-list {
+            display: flex; gap: 8px;
+        }
+
+        .tab-btn {
+            padding: 8px 16px; border-radius: 10px; font-size: 0.78rem; font-weight: 700;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .tab-btn.active {
+            background: rgba(0, 210, 255, 0.15); border-color: var(--neon-blue);
+            color: var(--neon-blue);
+        }
+
+        .search-input {
+            padding: 8px 14px; border-radius: 10px; font-size: 0.82rem;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-main); outline: none; width: 200px;
+        }
+
+        .search-input:focus { border-color: var(--neon-blue); }
+
+        /* Games Grid */
+        .games-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 10px; max-height: 380px; overflow-y: auto;
+            padding-right: 6px; margin-bottom: 18px;
+        }
+
+        .games-grid::-webkit-scrollbar { width: 5px; }
+        .games-grid::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.2); border-radius: 5px; }
+
+        .game-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px; padding: 12px 14px;
+            display: flex; align-items: center; gap: 10px;
+            cursor: pointer; transition: all 0.2s ease; user-select: none;
+        }
+
+        .game-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .game-card.selected {
+            background: rgba(0, 210, 255, 0.12);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 12px rgba(0, 210, 255, 0.15);
+        }
+
+        .game-checkbox {
+            width: 18px; height: 18px; border-radius: 5px;
+            border: 2px solid rgba(255,255,255,0.25);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; transition: all 0.2s;
+        }
+
+        .game-card.selected .game-checkbox {
+            background: var(--neon-blue); border-color: var(--neon-blue);
+        }
+
+        .game-card.selected .game-checkbox::after {
+            content: '✓'; color: #000; font-weight: 900; font-size: 11px;
+        }
+
+        .game-title {
+            font-size: 0.82rem; font-weight: 500; color: var(--text-main);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+        }
+
+        .game-appid {
+            font-size: 0.65rem; color: var(--text-muted); font-family: 'Orbitron', monospace;
+        }
+
+        /* Custom App ID row */
+        .custom-app-row {
+            display: flex; gap: 10px; margin-top: 14px;
+        }
+
+        .custom-app-row input {
+            flex: 1; padding: 10px 14px; border-radius: 10px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-main); font-size: 0.85rem; outline: none;
+        }
+
+        .custom-app-row button {
+            padding: 10px 20px; border-radius: 10px; border: none;
+            background: rgba(0, 210, 255, 0.15); color: var(--neon-blue);
+            font-family: 'Orbitron', monospace; font-size: 0.78rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s;
+        }
+
+        .custom-app-row button:hover { background: rgba(0, 210, 255, 0.28); }
+
+        /* Error & Warning Boxes */
+        .error-msg {
+            padding: 14px 18px; border-radius: 12px;
+            background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25);
+            color: var(--red); font-size: 0.85rem; margin-bottom: 16px;
+        }
+
+        .warn-msg {
+            padding: 14px 18px; border-radius: 12px;
+            background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25);
+            color: var(--orange); font-size: 0.82rem; line-height: 1.5; margin-bottom: 18px;
+        }
+
+        .spinner {
+            width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Views Visibility */
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        /* Responsive Layout Adjustments */
+        @media (max-width: 850px) {
+            .app-wrapper { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--card-border); padding: 18px; }
+            .main-content { padding: 20px 16px; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow-1"></div>
+    <div class="bg-glow-2"></div>
+
+    <div class="app-wrapper">
+        <!-- SIDEBAR: Steam Accounts Switcher -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">🎮</div>
+                <div class="brand-text">
+                    <h1>STEAM IDLE</h1>
+                    <p>Çoklu Hesap & Saat Kasma</p>
+                </div>
+            </div>
+
+            <div class="accounts-header">
+                <span>HESAPLARIN</span>
+                <button class="btn-add-account" onclick="showAddAccountView()" title="Yeni Hesap Ekle">+</button>
+            </div>
+
+            <div class="accounts-list" id="sidebarAccountsList">
+                <!-- Hesaplar buraya dinamik dolacak -->
+            </div>
+
+            <button class="btn-add-full" onclick="showAddAccountView()">
+                <span>+</span> YENİ HESAP EKLE
+            </button>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="main-content">
+
+            <!-- VIEW 1: LOGIN / ADD ACCOUNT FORM -->
+            <div class="view-section active" id="addAccountView">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🔐 Yeni Steam Hesabı Ekle</div>
+                    </div>
+
+                    <div class="warn-msg">
+                        ⚡ Siteye giren herkes kendi hesabını ekleyebilir. Giriş bilgileriniz sadece sunucudaki Steam oturumu için kullanılır.
+                    </div>
+
+                    <div id="loginErrorMsg"></div>
+
+                    <div class="form-group">
+                        <label>Steam Kullanıcı Adı</label>
+                        <input type="text" id="loginUsername" placeholder="Steam kullanıcı adını gir..." autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Şifre</label>
+                        <input type="password" id="loginPassword" placeholder="Şifreni gir...">
+                    </div>
+
+                    <button class="btn btn-primary" id="btnLogin" onclick="submitLogin()">
+                        GİRİŞ YAP VE HESABI EKLE
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW 2: STEAM GUARD INPUT -->
+            <div class="view-section" id="steamGuardView">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🛡️ Steam Guard Kodu Gerekli</div>
+                    </div>
+
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 18px;" id="steamGuardPrompt">
+                        Lütfen mobil uygulamanızdaki veya e-postanızdaki 5 haneli Steam Guard kodunu girin.
+                    </p>
+
+                    <div id="guardErrorMsg"></div>
+
+                    <div class="form-group">
+                        <label>Steam Guard Kodu</label>
+                        <input type="text" id="guardCode" placeholder="XXXXX" maxlength="5"
+                               style="font-family: 'Orbitron', monospace; font-size: 1.6rem; text-align: center; letter-spacing: 8px; text-transform: uppercase;">
+                    </div>
+
+                    <button class="btn btn-primary" id="btnGuard" onclick="submitSteamGuard()">
+                        KODU DOĞRULA
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW 3: ACTIVE ACCOUNT CONTROL PANEL -->
+            <div class="view-section" id="accountDashboardView">
+                <!-- Account Header Bar -->
+                <div class="account-header-bar">
+                    <div class="acc-active-details">
+                        <div class="acc-active-avatar" id="dashAvatar">?</div>
+                        <div>
+                            <div class="acc-active-title" id="dashPersona">Yukleniyor...</div>
+                            <div class="acc-active-id" id="dashSteamID">SteamID: --</div>
+                        </div>
+                    </div>
+                    <div>
+                        <span id="dashStatusBadge" class="tab-btn active">Çevrimiçi</span>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-val" id="dashUptime">00:00:00</div>
+                        <div class="stat-lbl">Çalışma Süresi</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-val" id="dashActiveCount">0</div>
+                        <div class="stat-lbl">Kasılan Oyun</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-val" id="dashOwnedCount">0</div>
+                        <div class="stat-lbl">Kütüphane Oyunları</div>
+                    </div>
+                </div>
+
+                <!-- Games Selection Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🕹️ Saat Kasılacak Oyunları Seç</div>
+                    </div>
+
+                    <div class="games-tab-bar">
+                        <div class="tabs-list">
+                            <button class="tab-btn active" id="tabOwned" onclick="switchGameTab('owned')">
+                                Hesaptaki Oyunlar (<span id="countOwnedTab">0</span>)
+                            </button>
+                            <button class="tab-btn" id="tabPopular" onclick="switchGameTab('popular')">
+                                Popüler Oyunlar
+                            </button>
+                        </div>
+                        <input type="text" class="search-input" id="gameSearchInput" placeholder="Oyun ara..." oninput="renderGamesList()">
+                    </div>
+
+                    <div class="games-grid" id="gamesContainer">
+                        <!-- Oyun kartları dinamik eklenecek -->
+                    </div>
+
+                    <div class="custom-app-row">
+                        <input type="number" id="customAppIdInput" placeholder="Özel Steam App ID gir (Örn: 730)">
+                        <button onclick="addCustomAppId()">+ Ekle</button>
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" style="flex: 2; min-width: 220px;" id="btnIdleControl" onclick="toggleIdle()">
+                        ▶ IDLE BAŞLAT
+                    </button>
+                    <button class="btn btn-danger" style="flex: 1; min-width: 140px;" onclick="logoutAccount()">
+                        🚪 HESABI KALDIR
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // ============================================================
+        // GLOBAL STATE & SESSION MANAGEMENT
+        // ============================================================
+        function getSessionId() {
+            let sid = localStorage.getItem('steam_idle_sid');
+            if (!sid) {
+                sid = 'sid_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+                localStorage.setItem('steam_idle_sid', sid);
+            }
+            return sid;
+        }
+
+        const sessionId = getSessionId();
+        let accountsList = [];
+        let activeUsername = null;
+        let activeAccountData = null;
+        let selectedAppIds = new Set();
+        let currentTab = 'owned'; // 'owned' veya 'popular'
+        let popularGames = [];
+        let pollingInterval = null;
+
+        // Custom Fetch wrapper ile Session Header ekleme
+        async function apiFetch(url, options = {}) {
+            options.headers = options.headers || {};
+            options.headers['x-session-id'] = sessionId;
+            options.headers['Content-Type'] = 'application/json';
+            const res = await fetch(url, options);
+            return await res.json();
+        }
+
+        // ============================================================
+        // VIEW SWITCHER
+        // ============================================================
+        function showView(viewId) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        function showAddAccountView() {
+            activeUsername = null;
+            renderSidebar();
+            showView('addAccountView');
+            document.getElementById('loginErrorMsg').innerHTML = '';
+        }
+
+        // ============================================================
+        // SIDEBAR & ACCOUNTS LOADING
+        // ============================================================
+        async function loadAccounts() {
+            try {
+                const data = await apiFetch('/api/session/accounts');
+                if (data.success) {
+                    accountsList = data.accounts || [];
+                    renderSidebar();
+
+                    if (accountsList.length > 0) {
+                        // Eğer aktif seçili hesap yoksa ilk hesabı seç
+                        if (!activeUsername || !accountsList.find(a => a.username === activeUsername)) {
+                            selectAccount(accountsList[0].username);
+                        } else {
+                            selectAccount(activeUsername);
+                        }
+                    } else {
+                        showAddAccountView();
+                    }
+                }
+            } catch (e) {
+                console.error('Hesaplar yüklenirken hata:', e);
+            }
+        }
+
+        function renderSidebar() {
+            const container = document.getElementById('sidebarAccountsList');
+            container.innerHTML = '';
+
+            accountsList.forEach(acc => {
+                const card = document.createElement('div');
+                const isSelected = acc.username === activeUsername;
+                card.className = 'account-card' + (isSelected ? ' active' : '');
+                card.onclick = () => selectAccount(acc.username);
+
+                let statusDotClass = 'offline';
+                let subText = 'Çevrimdışı';
+
+                if (acc.isIdling) {
+                    statusDotClass = 'idling';
+                    subText = `🎮 ${acc.activeGamesCount} oyun kasılıyor`;
+                } else if (acc.loggedIn) {
+                    statusDotClass = 'online';
+                    subText = 'Çevrimiçi';
+                } else if (acc.steamGuardNeeded) {
+                    statusDotClass = 'guard';
+                    subText = '🔐 Guard Bekliyor';
+                }
+
+                card.innerHTML = `
+                    <div class="acc-avatar">
+                        ${(acc.persona || acc.username).charAt(0).toUpperCase()}
+                        <div class="acc-status-dot ${statusDotClass}"></div>
+                    </div>
+                    <div class="acc-info">
+                        <div class="acc-name">${acc.persona || acc.username}</div>
+                        <div class="acc-sub">${subText}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // ============================================================
+        // SELECT ACCOUNT & DASHBOARD
+        // ============================================================
+        async function selectAccount(username) {
+            activeUsername = username;
+            renderSidebar();
+
+            try {
+                const data = await apiFetch(`/api/account/status?username=${encodeURIComponent(username)}`);
+                if (data.success) {
+                    activeAccountData = data;
+                    if (data.steamGuardNeeded) {
+                        showView('steamGuardView');
+                        document.getElementById('steamGuardPrompt').textContent =
+                            data.steamGuardType === 'email'
+                                ? `[${username}] E-postanıza gelen 5 haneli Steam Guard kodunu girin.`
+                                : `[${username}] Steam mobil uygulamanızdaki 5 haneli kodu girin.`;
+                    } else if (data.loggedIn) {
+                        showView('accountDashboardView');
+                        updateDashboardUI();
+                    } else if (data.error) {
+                        showAddAccountView();
+                        document.getElementById('loginErrorMsg').innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
+                    }
+                }
+            } catch (e) {
+                console.error('Hesap detayı yüklenemedi:', e);
+            }
+        }
+
+        function updateDashboardUI() {
+            if (!activeAccountData) return;
+
+            const acc = activeAccountData;
+            document.getElementById('dashAvatar').textContent = (acc.persona || acc.username).charAt(0).toUpperCase();
+            document.getElementById('dashPersona').textContent = acc.persona || acc.username;
+            document.getElementById('dashSteamID').textContent = acc.steamID ? `SteamID: ${acc.steamID}` : `Kullanıcı: ${acc.username}`;
+
+            document.getElementById('dashUptime').textContent = formatUptime(acc.uptime || 0);
+            document.getElementById('dashActiveCount').textContent = acc.games ? acc.games.length : 0;
+            document.getElementById('dashOwnedCount').textContent = acc.ownedGames ? acc.ownedGames.length : 0;
+            document.getElementById('countOwnedTab').textContent = acc.ownedGames ? acc.ownedGames.length : 0;
+
+            // Kasılan oyunları senkronize et
+            if (acc.games && acc.games.length > 0) {
+                acc.games.forEach(id => selectedAppIds.add(Number(id)));
+            }
+
+            const badge = document.getElementById('dashStatusBadge');
+            const idleBtn = document.getElementById('btnIdleControl');
+
+            if (acc.games && acc.games.length > 0) {
+                badge.className = 'tab-btn active';
+                badge.style.borderColor = 'var(--green)';
+                badge.style.color = 'var(--green)';
+                badge.textContent = '🟢 Idle Çalışıyor';
+
+                idleBtn.innerHTML = '⏹ IDLE DURDUR';
+                idleBtn.className = 'btn btn-danger';
+            } else {
+                badge.className = 'tab-btn active';
+                badge.style.borderColor = 'var(--neon-blue)';
+                badge.style.color = 'var(--neon-blue)';
+                badge.textContent = '🔵 Çevrimiçi';
+
+                idleBtn.innerHTML = `▶ IDLE BAŞLAT (${selectedAppIds.size} Oyun)`;
+                idleBtn.className = 'btn btn-primary';
+            }
+
+            renderGamesList();
+        }
+
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        // ============================================================
+        // LOGIN & STEAM GUARD ACTIONS
+        // ============================================================
+        async function submitLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('btnLogin');
+            const errDiv = document.getElementById('loginErrorMsg');
+
+            if (!username || !password) {
+                errDiv.innerHTML = '<div class="error-msg">Kullanıcı adı ve şifre girilmelidir!</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> GİRİŞ YAPILIYOR...';
+            errDiv.innerHTML = '';
+
+            try {
+                const data = await apiFetch('/api/account/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (data.success) {
+                    activeUsername = username;
+                    await loadAccounts();
+                } else if (data.steamGuard) {
+                    activeUsername = username;
+                    showView('steamGuardView');
+                    document.getElementById('steamGuardPrompt').textContent =
+                        data.type === 'email'
+                            ? `E-postanıza gelen Steam Guard kodunu girin.`
+                            : `Steam mobil uygulamanızdaki Guard kodunu girin.`;
+                } else {
+                    errDiv.innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
+                }
+            } catch (e) {
+                errDiv.innerHTML = '<div class="error-msg">Sunucuya bağlanırken hata oluştu.</div>';
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'GİRİŞ YAP VE HESABI EKLE';
+        }
+
+        async function submitSteamGuard() {
+            const code = document.getElementById('guardCode').value.trim();
+            const btn = document.getElementById('btnGuard');
+            const errDiv = document.getElementById('guardErrorMsg');
+
+            if (!code || !activeUsername) {
+                errDiv.innerHTML = '<div class="error-msg">Kodu girin!</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> DOĞRULANIYOR...';
+            errDiv.innerHTML = '';
+
+            try {
+                const data = await apiFetch('/api/account/steamguard', {
+                    method: 'POST',
+                    body: JSON.stringify({ username: activeUsername, code })
+                });
+
+                if (data.success) {
+                    await loadAccounts();
+                } else {
+                    errDiv.innerHTML = `<div class="error-msg">❌ ${data.error}</div>`;
+                }
+            } catch (e) {
+                errDiv.innerHTML = '<div class="error-msg">Sunucu bağlantı hatası.</div>';
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'KODU DOĞRULA';
+        }
+
+        // ============================================================
+        // GAMES LIST & SELECTION
+        // ============================================================
+        async function loadPopularGames() {
+            try {
+                popularGames = await apiFetch('/api/games');
+            } catch (e) {}
+        }
+
+        function switchGameTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabOwned').className = 'tab-btn' + (tab === 'owned' ? ' active' : '');
+            document.getElementById('tabPopular').className = 'tab-btn' + (tab === 'popular' ? ' active' : '');
+            renderGamesList();
+        }
+
+        function renderGamesList() {
+            const container = document.getElementById('gamesContainer');
+            const searchQuery = document.getElementById('gameSearchInput').value.toLowerCase().trim();
+            container.innerHTML = '';
+
+            let listToRender = [];
+            if (currentTab === 'owned' && activeAccountData && activeAccountData.ownedGames) {
+                listToRender = activeAccountData.ownedGames;
+            } else {
+                listToRender = popularGames;
+            }
+
+            if (searchQuery) {
+                listToRender = listToRender.filter(g =>
+                    g.name.toLowerCase().includes(searchQuery) || String(g.appId).includes(searchQuery)
+                );
+            }
+
+            if (listToRender.length === 0) {
+                container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 30px; font-size: 0.85rem;">
+                    ${currentTab === 'owned' ? 'Kütüphanede oyun bulunamadı veya henüz yükleniyor...' : 'Aranan oyun bulunamadı.'}
+                </div>`;
+                return;
+            }
+
+            listToRender.forEach(game => {
+                const card = document.createElement('div');
+                const isSelected = selectedAppIds.has(Number(game.appId));
+                card.className = 'game-card' + (isSelected ? ' selected' : '');
+                card.onclick = () => toggleGameSelection(Number(game.appId));
+
+                card.innerHTML = `
+                    <div class="game-checkbox"></div>
+                    <span class="game-title" title="${game.name}">${game.name}</span>
+                    <span class="game-appid">#${game.appId}</span>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function toggleGameSelection(appId) {
+            if (selectedAppIds.has(appId)) {
+                selectedAppIds.delete(appId);
+            } else {
+                if (selectedAppIds.size >= 32) {
+                    alert('Steam aynı anda en fazla 32 oyun idle etmeye izin verir!');
+                    return;
+                }
+                selectedAppIds.add(appId);
+            }
+            updateDashboardUI();
+        }
+
+        function addCustomAppId() {
+            const input = document.getElementById('customAppIdInput');
+            const appId = parseInt(input.value);
+            if (!appId || appId <= 0) return;
+
+            selectedAppIds.add(appId);
+            input.value = '';
+            updateDashboardUI();
+        }
+
+        // ============================================================
+        // IDLE START / STOP
+        // ============================================================
+        async function toggleIdle() {
+            if (!activeAccountData || !activeUsername) return;
+
+            const isCurrentlyIdling = activeAccountData.games && activeAccountData.games.length > 0;
+
+            if (isCurrentlyIdling) {
+                // Durdur
+                try {
+                    await apiFetch('/api/account/stop', {
+                        method: 'POST',
+                        body: JSON.stringify({ username: activeUsername })
+                    });
+                    await selectAccount(activeUsername);
+                } catch (e) {}
+            } else {
+                // Başlat
+                if (selectedAppIds.size === 0) {
+                    alert('Lütfen en az 1 oyun seçin!');
+                    return;
+                }
+
+                try {
+                    const data = await apiFetch('/api/account/idle', {
+                        method: 'POST',
+                        body: JSON.stringify({ username: activeUsername, appIds: Array.from(selectedAppIds) })
+                    });
+
+                    if (data.success) {
+                        await selectAccount(activeUsername);
+                    } else {
+                        alert('Hata: ' + data.error);
+                    }
+                } catch (e) {}
+            }
+        }
+
+        // ============================================================
+        // LOGOUT ACCOUNT
+        // ============================================================
+        async function logoutAccount() {
+            if (!activeUsername) return;
+            if (!confirm(`[${activeUsername}] hesabını kaldırmak istediğinize emin misiniz? Idle duracaktır.`)) return;
+
+            try {
+                await apiFetch('/api/account/logout', {
+                    method: 'POST',
+                    body: JSON.stringify({ username: activeUsername })
+                });
+                activeUsername = null;
+                selectedAppIds.clear();
+                await loadAccounts();
+            } catch (e) {}
+        }
+
+        // ============================================================
+        // POLLING FOR REALTIME STATUS
+        // ============================================================
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(async () => {
+                if (activeUsername && document.getElementById('accountDashboardView').classList.contains('active')) {
+                    const data = await apiFetch(`/api/account/status?username=${encodeURIComponent(activeUsername)}`);
+                    if (data.success) {
+                        activeAccountData = data;
+                        document.getElementById('dashUptime').textContent = formatUptime(data.uptime || 0);
+                        document.getElementById('dashActiveCount').textContent = data.games ? data.games.length : 0;
+                        document.getElementById('dashOwnedCount').textContent = data.ownedGames ? data.ownedGames.length : 0;
+                        document.getElementById('countOwnedTab').textContent = data.ownedGames ? data.ownedGames.length : 0;
+                    }
+                }
+            }, 3000);
+        }
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+        async function init() {
+            await loadPopularGames();
+            await loadAccounts();
+            startPolling();
+        }
+
+        init();
+
+        // Keyboard shortcuts
+        document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+        document.getElementById('guardCode').addEventListener('keydown', e => { if (e.key === 'Enter') submitSteamGuard(); });
+    </script>
+</body>
+</html>

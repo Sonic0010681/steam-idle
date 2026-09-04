@@ -1,0 +1,14 @@
+{
+  "name": "steam-idle",
+  "version": "1.0.0",
+  "description": "Steam oyun saati kasma - Web arayüzlü",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "steam-user": "^5.0.0"
+  }
+}
